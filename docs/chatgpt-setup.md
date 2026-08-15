@@ -16,7 +16,18 @@ where conrelid = 'events'::regclass
 
 Expected: the definition includes `activity_logged`.
 
-3. Confirm the four tables still exist:
+3. [`0004_plan_active_uniqueness.sql`](../supabase/migrations/0004_plan_active_uniqueness.sql) has been applied. Confirm the index exists:
+
+```sql
+select indexdef
+from pg_indexes
+where tablename = 'plans'
+  and indexname = 'plans_one_active_per_user';
+```
+
+Expected: one row, `where (status = 'active'::text)` in the definition.
+
+4. Confirm the four tables still exist:
 
 ```sql
 select table_name
@@ -28,7 +39,7 @@ order by table_name;
 
 Expected: four rows.
 
-4. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
+5. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
 
 `USER_ID` is already set to `815c0d8e-9e76-4dbb-9c89-86a504bb5da0`. Keep it unless you intentionally rotate identity.
 

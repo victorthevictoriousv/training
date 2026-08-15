@@ -54,7 +54,7 @@ One row per user. `user_id` is unique.
 | `activated_at` | `timestamptz` | Set when status becomes `active` |
 | `archived_at` | `timestamptz` | |
 
-v1 allows more than one `active` row at the database level. Skills must keep **at most one `active`** plan per user, and **at most one `proposed` future week**.
+The database refuses a second `active` plan per user (`plans_one_active_per_user`: unique on `user_id` where `status = 'active'`). Skills must still keep **at most one `proposed` future week** — that half is not a DB constraint, because “future” depends on `current_date`.
 
 Lookup is by **date**, not by the `active` row alone: the covering plan is the row whose `period_start`–`period_end` contains the date, preferring `active`, then `proposed`, then `completed`, then `superseded`. A still-running week must stay visible after the next week is saved.
 

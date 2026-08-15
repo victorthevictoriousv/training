@@ -40,7 +40,7 @@ After any write, say what was saved, in Swedish.
   2. If a `proposed` row already exists for that same `period_start`, supersede **that** row, then insert the new one.
   3. Insert the new row as `proposed` and insert `plan_proposed`. Do not activate in the same turn. A `proposed` row after `godkänn` is the saved next week, not a chat draft.
 - Lazy activate on plan read in `training-plan`: if a `proposed` plan’s period contains today, set the expired `active` week (`period_end` < today) to `completed` and activate the new row. No cron.
-- Keep at most one `active` plan. At most one `proposed` future week. Chat drafts stay in the conversation until approval.
+- Keep at most one `active` plan (the database rejects a second `active` row). At most one `proposed` future week. Chat drafts stay in the conversation until approval.
 
 ## Presenting a saved session
 

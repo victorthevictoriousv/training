@@ -18,14 +18,21 @@ Record what actually happened. Do not invent loads. Weekly review is not impleme
 - Attach unmatched gym work to another session the same day, or write `session_completed` for extra work that is not in `content`
 - Auto-rewrite remaining days because they logged extra. Offer a reshape if it conflicts; wait
 
-## Extra session vs plan change
+## Intent
 
-If the message is extra or unplanned work, or a new condition, classify intent (meaning, not a phrase list):
+Classify once (meaning, not a phrase list). Run only those ids from `skills/_shared/queries.md`. Do not run every SELECT in this file. Do not lazy-activate (`Q_lazy_activate_candidate` is training-plan only).
 
-- **Log only** — they report what already happened. Write the event here. Leave the plan unchanged.
-- **Add to this week** / **reshape remaining** — they want it programmed or remaining days adapted. Log any work they already did, then load `training-plan` for one remaining-week draft. Do not log a future session as done.
-
-`logga gympasset` only fills a *planned* strength session. If today has no planned gym, log exercise by exercise, or they add the session via `training-plan` first.
+| User means | Section | Queries | Skip |
+| --- | --- | --- | --- |
+| Single set or correction (`bänk 80x5`, `bänk 82.5`) | §2 | `Q_covering_plan`, `Q_today_logs` | `Q_last_working`, `Q_pr`, habits, lazy-activate |
+| Extra-plan activity (`gåband`, `yoga`, `klättrade`) | §3 | `Q_covering_plan`, `Q_habits`, `Q_today_activity` | `Q_last_working`, `Q_pr` |
+| Wrap-up / `logga dagens pass` / **Loggat** vs **Kvar** | §4A | `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_habit_last_dates` | `Q_last_working` unless they also take the shortcut |
+| `logga gympasset` / `klarade alla övningar` | §4B | `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr` |
+| `resten enligt plan` | §4C | `Q_covering_plan`, `Q_today_logs` | Copy last working into `exercise_logged` |
+| Skipped a session | §5 | `Q_covering_plan` | Last working, PR |
+| “Vad är mitt PR?” / personbästa | §6 | `Q_pr` | Covering-plan writes, last working as the answer |
+| “Hur går bänken?” / utveckling | §6 | `Q_recent_results` | PR as a headline, plan writes |
+| Last weight / lägg på X kg (asked) | §6 | `Q_last_working` | `Q_pr` unless they also asked PR |
 
 ## Before you start
 
@@ -35,62 +42,28 @@ Read if not already in context:
 - `docs/autonomy.md`
 - `docs/provenance.md`
 - `docs/data-contracts.md`
+- `skills/_shared/queries.md`
 - `references/log-schema.md`
 - `references/parse-and-match.md`
 - `references/loads-and-prs.md`
 - `skills/training-plan/references/activity-load.md`
 
+## Extra session vs plan change
+
+If the message is extra or unplanned work, or a new condition, classify intent (meaning, not a phrase list):
+
+- **Log only** — they report what already happened. Write the event here. Leave the plan unchanged.
+- **Add to this week** / **reshape remaining** — they want it programmed or remaining days adapted. Log any work they already did, then load `training-plan` for one remaining-week draft. Do not log a future session as done.
+
+`logga gympasset` only fills a *planned* strength session. If today has no planned gym, log exercise by exercise, or they add the session via `training-plan` first.
+
 ## Procedure
 
 ### 1. Load plan, habits, and existing logs
 
-Date = today in `Europe/Stockholm` unless the user named a day.
+Date = today in `Europe/Stockholm` unless the user named a day. Run only the `Q_*` ids from the intent table (`Q_covering_plan`, `Q_today_logs`, `Q_habits`, `Q_today_activity`, `Q_last_working` as listed). Do not add `Q_pr` or lazy-activate.
 
-```sql
-select id, status, period_start, period_end, title, content
-from plans
-where user_id = :USER_ID
-  and period_start <= :date
-  and period_end >= :date
-  and status in ('active', 'proposed', 'completed', 'superseded')
-order by
-  case status
-    when 'active' then 0
-    when 'proposed' then 1
-    when 'completed' then 2
-    else 3
-  end,
-  activated_at desc nulls last,
-  created_at desc
-limit 1;
-
-select data->'lifestyle'->'habits' as habits
-from user_profiles
-where user_id = :USER_ID;
-
-select payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'exercise_logged'
-  and payload->>'date' = :date
-order by occurred_at desc;
-
-select payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'activity_logged'
-  and payload->>'date' = :date
-order by occurred_at desc;
-
-select payload->>'habit_key' as habit_key, max(payload->>'date') as last_date
-from events
-where user_id = :USER_ID
-  and type = 'activity_logged'
-  and payload->>'habit_key' is not null
-group by payload->>'habit_key';
-```
-
-Current load per `exercise_key` is the first row for that key in this list (already newest-first). Current extra-plan activity is the latest row per `activity_key` + `instance` (missing `instance` = 1). Sum those current bouts for the day's load. Next new bout: `max(instance) + 1` for that date + key.
+Current load per `exercise_key` is the first row for that key in `Q_today_logs` (already newest-first). Current extra-plan activity is the latest row per `activity_key` + `instance` in `Q_today_activity` (missing `instance` = 1). Sum those current bouts for the day's load. Next new bout: `max(instance) + 1` for that date + key.
 
 Match planned items against that covering row’s `content` for `:date`, not against `status = 'active'` alone. Do not `UPDATE plans` here (no lazy activate).
 
@@ -187,7 +160,7 @@ Do not treat background walks or background yoga as remaining planned work. Ment
 
 Filling from history is an assumption. Show a card, wait for one `godkänn`, then write. Do not write before approval. Do not auto-bump. Do not copy PR or plan `load` text.
 
-1. Also `SELECT` last working per `exercise_key` (any date) with the query in `references/loads-and-prs.md` (full `payload` / `sets`, not only kg). Use today's logs from step 1.
+1. Also run `Q_last_working` (full `payload` / `sets`, not only kg). Use today's logs from `Q_today_logs`.
 2. Target session: `gympass` → today's strength session only. Bare `passet` on a run-only day → the run. Two sessions the same day and they did not name one: ask once. Pain, skip, or “inte alla”: ask once, do not write.
 3. Working items only: strength items with `sets` and `reps`, or a run item with duration/distance. Skip warmup and duration-only blocks (easy bike). Skip items already logged today.
 4. Default to the prescribed (home) `name` / `key`. If the item has `preferred`, put `Förstahand (annat gym): {name} — säg till om du körde den` on the card. Stay on the home key unless they switch before `godkänn`.
@@ -225,7 +198,7 @@ Clear skip (`hoppade över`, `kunde inte träna idag`): insert `session_missed`,
 
 ### 6. PR, last weight, or results (only when asked)
 
-If they ask for a PR, last weight, how an exercise is going, or similar: use `references/loads-and-prs.md`. Answer that exercise (or a short list if they asked generally). Do not volunteer PRs or full histories on ordinary logs or “dagens pass”.
+If they ask for a PR, last weight, how an exercise is going, or similar: run `Q_pr`, `Q_last_working`, or `Q_recent_results` as the intent table says. Rules in `references/loads-and-prs.md`. Answer that exercise (or a short list if they asked generally). Do not volunteer PRs or full histories on ordinary logs or “dagens pass”.
 
 ### 7. After a write
 

@@ -36,43 +36,19 @@ Last working beats PR for programming and for the shortcut fill.
 
 ## Queries
 
-Last working per exercise:
+SQL lives in `skills/_shared/queries.md`. Copy the named id; do not paste a variant.
 
-```sql
-select distinct on (payload->>'exercise_key')
-  payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'exercise_logged'
-order by payload->>'exercise_key', occurred_at desc;
-```
+| Need | Id |
+| --- | --- |
+| Last working per exercise | `Q_last_working` |
+| PR per exercise | `Q_pr` |
+| Recent results for one exercise | `Q_recent_results` |
 
-PR per exercise (ignore null / non-numeric `load_kg`):
+`Q_pr` uses `[.]` for a literal decimal point so values like `82.5` count. Do not write `\\.` — that drops decimals.
 
-```sql
-select payload->>'exercise_key' as exercise_key,
-       max((set_row->>'load_kg')::numeric) as pr_kg
-from events e
-cross join lateral jsonb_array_elements(e.payload->'sets') as set_row
-where e.user_id = :USER_ID
-  and e.type = 'exercise_logged'
-  and (set_row->>'load_kg') ~ '^[0-9]+(\\.[0-9]+)?$'
-group by 1;
-```
+Ordered by logged date first, then insert time, so a backfilled entry for an earlier date never outranks a genuinely more recent session.
 
-Recent results for one exercise (when they ask how it is going):
-
-```sql
-select occurred_at, payload
-from events
-where user_id = :USER_ID
-  and type = 'exercise_logged'
-  and payload->>'exercise_key' = :exercise_key
-order by occurred_at desc
-limit 8;
-```
-
-Summarize in Swedish: date, kg × reps, RPE if present. Same idea for a run key with duration/distance.
+Summarize `Q_recent_results` in Swedish: date, kg × reps, RPE if present. Same idea for a run key with duration/distance.
 
 ## Suggest the next strength load
 

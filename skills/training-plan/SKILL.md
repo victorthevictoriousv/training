@@ -17,6 +17,19 @@ Create one ISO week of training from the confirmed profile. Draft in chat. Write
 - Put `plan_inclusion = background` habits into `content.days` as sessions
 - Run DDL
 
+## Intent
+
+Classify once (meaning, not a phrase list). Run only those ids from `skills/_shared/queries.md`. Do not run every SELECT in this file. Writes stay in the procedure below.
+
+| User means | Section | Queries | Skip |
+| --- | --- | --- | --- |
+| Today / tomorrow / a named day / “vad ska jag träna” | §4 | `Q_lazy_activate_candidate` (apply §1 writes if a row), `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr`, `Q_activity_lookback`, week INSERT |
+| This week / the weekly plan | §4 | Same as a day, plus `Q_queued_next_week` | `Q_pr` |
+| Draft or approve a new week | §2–3, §5 | `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_last_working`, `Q_activity_lookback`, `Q_habit_last_dates` | `Q_pr`. Future week: do not activate |
+| Swap, gym-unavailable, extra session, reshape remaining | §4 | `Q_covering_plan`, then draft; writes after `godkänn` | Log `INSERT`, `Q_pr` |
+| They already did the work | hand off `training-log-and-review` | — | Plan UPDATE until they ask |
+| PR / last weight / “hur går det” | hand off log skill | — | All plan writes |
+
 ## Before you start
 
 Read if not already in context:
@@ -25,6 +38,7 @@ Read if not already in context:
 - `docs/autonomy.md`
 - `docs/provenance.md`
 - `docs/data-contracts.md`
+- `skills/_shared/queries.md`
 - `references/plan-schema.md`
 - `references/minor-vs-major.md`
 - `references/exercise-substitutions.md`
@@ -36,25 +50,14 @@ Read if not already in context:
 
 ### 1. Load profile and current plan
 
-Today = current date in `Europe/Stockholm`. Session lookup is by **date**, not by “the `active` row”.
+Today = current date in `Europe/Stockholm`. Session lookup is by **date**, not by “the `active` row”. Run only the `Q_*` ids from the intent table.
 
-**Lazy activate** (no cron). If a `proposed` plan’s period contains today:
+**Lazy activate** (no cron). When the intent table includes `Q_lazy_activate_candidate`, run it. If a `proposed` plan’s period contains today:
 
 1. Set any `active` plan whose `period_end < today` to `completed` and `archived_at = now()`. That week ended; do not `superseded`.
 2. Set that `proposed` row to `active`, `activated_at = now()`, insert `plan_activated`.
 
-```sql
-select id, status, period_start, period_end, version, title, content
-from plans
-where user_id = :USER_ID
-  and status = 'proposed'
-  and period_start <= :today
-  and period_end >= :today
-order by created_at desc
-limit 1;
-```
-
-If that returns a row, complete the expired active week (if any), then activate:
+If `Q_lazy_activate_candidate` returns a row, complete the expired active week (if any), then activate:
 
 ```sql
 update plans
@@ -75,66 +78,11 @@ values (
 );
 ```
 
-Do not lazy-activate during `training-log-and-review` (that skill must not `UPDATE plans`). Covering-plan SELECT below is enough for logs.
+Do not lazy-activate during `training-log-and-review` (that skill must not `UPDATE plans`). `Q_covering_plan` is enough for logs.
 
-Then load profile, the **covering plan for `:date`** (today unless the user named a day), and any queued future week:
+Then run the remaining ids from the intent table (`Q_profile`, `Q_covering_plan`, `Q_queued_next_week`, `Q_last_working`, `Q_activity_lookback`, `Q_habit_last_dates` as listed). `:date` is today unless the user named a day.
 
-```sql
-select safety_status, onboarding_status, data, provenance
-from user_profiles
-where user_id = :USER_ID;
-
--- Covering plan for :date (canonical lookup)
-select id, status, period_start, period_end, version, title, content
-from plans
-where user_id = :USER_ID
-  and period_start <= :date
-  and period_end >= :date
-  and status in ('active', 'proposed', 'completed', 'superseded')
-order by
-  case status
-    when 'active' then 0
-    when 'proposed' then 1
-    when 'completed' then 2
-    else 3
-  end,
-  activated_at desc nulls last,
-  created_at desc
-limit 1;
-
--- Queued next week (approved, not yet current)
-select id, status, period_start, period_end, version, title, content
-from plans
-where user_id = :USER_ID
-  and status = 'proposed'
-  and period_start > :today
-order by period_start, created_at desc
-limit 1;
-
-select distinct on (payload->>'exercise_key')
-  payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'exercise_logged'
-order by payload->>'exercise_key', occurred_at desc;
-
-select payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'activity_logged'
-  and (payload->>'date') >= :lookback_date
-  and (payload->>'date') <= :period_end
-order by occurred_at desc;
-
-select payload->>'habit_key' as habit_key, max(payload->>'date') as last_date
-from events
-where user_id = :USER_ID
-  and type = 'activity_logged'
-  and payload->>'habit_key' is not null
-group by payload->>'habit_key';
-```
-
-`:lookback_date` is the Monday of the week before the covering plan’s week (or the week being drafted). `:period_end` is that plan’s `period_end`. Use `data.lifestyle.habits` from the profile row (may be absent). Use last working loads when drafting or showing sessions (`skills/training-log-and-review/references/loads-and-prs.md`). Do not print PRs unless asked. Apply `references/activity-load.md` when drafting: pattern vs instance, and habit catch-up if no matching `activity_logged` in the last 7 days.
+`:lookback_date` is the Monday of the week before the covering plan’s week (or the week being drafted). `:period_end` is that plan’s `period_end`. Use `data.lifestyle.habits` from the profile row (may be absent). Use last working loads when drafting or showing sessions (`Q_last_working` plus `skills/training-log-and-review/references/loads-and-prs.md`). Do not print PRs unless asked. Apply `references/activity-load.md` when drafting: pattern vs instance, and habit catch-up if no matching `activity_logged` in the last 7 days.
 
 If no profile row, or any minimum field from `skills/training-onboarding/references/profile-fields.md` is missing, switch to `training-onboarding`. Do not draft a full week from guesses.
 
@@ -184,27 +132,9 @@ If they request a change to a saved plan, follow "Present or change a saved sess
 
 Use this whenever the user wants to see or change planned training for today, tomorrow, a named date, or the current week. Match intent, not exact wording.
 
-**Read first. Always.** Resolve the date in `Europe/Stockholm` (today unless the user named a date). Run lazy activate if needed, then the covering-plan `SELECT` in step 1 for **that date**. Do not use an earlier chat message as the source of the workout. Do not use `status = 'active'` alone — that misses remaining days of a week that was superseded when the next week was saved.
+**Read first. Always.** Resolve the date in `Europe/Stockholm` (today unless the user named a date). Run the day-row queries from the intent table: `Q_lazy_activate_candidate` (apply §1 writes if a row), then `Q_covering_plan` for **that date**, `Q_today_logs`, and `Q_last_working`. Do not use an earlier chat message as the source of the workout. Do not use `status = 'active'` alone — that misses remaining days of a week that was superseded when the next week was saved.
 
-Also load today's logs and last working loads (do not skip this when presenting a day):
-
-```sql
-select payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'exercise_logged'
-  and payload->>'date' = :date
-order by occurred_at desc;
-
-select distinct on (payload->>'exercise_key')
-  payload, occurred_at
-from events
-where user_id = :USER_ID
-  and type = 'exercise_logged'
-order by payload->>'exercise_key', occurred_at desc;
-```
-
-Keep the latest row per `payload.exercise_key` for today, and use the second query as last working weight.
+Keep the latest row per `payload.exercise_key` in `Q_today_logs` for today, and use `Q_last_working` as last working weight.
 
 - If the Supabase tool fails or returns an error: say in Swedish that you could not read the saved plan. Stop. Do not invent a session.
 - If no covering plan exists for that date: say there is no saved plan for that date and offer to create a week (step 2–3). Do not invent a session. Do not call it a rest day.
@@ -217,7 +147,7 @@ Keep the latest row per `payload.exercise_key` for today, and use the second que
 - If not yet logged and last working kg exists: show **lägg på X kg** for the prescribed `name` (home) by default. If they are clearly doing the first-choice, cue that key instead.
 - If not yet logged and no history: RPE only; do not invent kg.
 - Do not show PR unless asked. For “hur går det” / results, use `training-log-and-review`.
-- If they ask for a PR, load `training-log-and-review` and `loads-and-prs.md`.
+- If they ask for a PR, load `training-log-and-review` (`Q_pr`). Do not run `Q_pr` here.
 - If they are reporting what they lifted, walked, climbed, or hiked, switch to `skills/training-log-and-review/SKILL.md`. Do not treat a log line as a plan rewrite. If they also asked to adapt remaining days, log first, then continue here with one remaining-week draft.
 - Do not list background habits or unplanned `activity_logged` as **Sparat pass**. Scheduled habit sessions that are in `content` are **Sparat pass**. Unplanned gym (`exercise_logged` with `session_id` null) is also not **Sparat pass**.
 - “Den här veckan” / the weekly plan: present the covering plan for **today**. If a `proposed` future week exists, mention it as already saved from that Monday — do not hide remaining days of the current week.
@@ -293,7 +223,7 @@ If `data.equipment` is missing `home_gym_substitutions`, `jsonb_set` still creat
 
 ### 5. Write after approval (new or replacement week)
 
-Keep at most one `active` plan. At most one `proposed` future week. Chat drafts stay in the conversation until `godkänn`; a `proposed` **row** after approval is the saved next week, not a draft.
+Keep at most one `active` plan (the database rejects a second). At most one `proposed` future week. Chat drafts stay in the conversation until `godkänn`; a `proposed` **row** after approval is the saved next week, not a draft.
 
 Today = current date in `Europe/Stockholm`. Allocate `new_plan_id` with `gen_random_uuid()` first. `version` is `1` for the first plan, otherwise previous `version + 1`. `payload` follows `docs/data-contracts.md`.
 

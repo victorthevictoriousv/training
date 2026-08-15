@@ -16,6 +16,18 @@ Collect profile data, run a safety screen, and write confirmed facts only after 
 - Write `user_profiles.data` before the user approves the summary
 - Store AI conclusions, kcal, MET, or TDEE as profile facts
 
+## Intent
+
+Classify once. Run only those ids from `skills/_shared/queries.md`. Writes stay in this skill.
+
+| User means | Section | Queries | Skip |
+| --- | --- | --- | --- |
+| New user, missing profile, safety screening, “jag vill börja” | §1–5 | `Q_profile` | Plans, logs, last working, PR |
+| Update a confirmed field (goals, time, equipment, injuries) | §1, then confirmation | `Q_profile` | Plan UPDATE, session logs |
+| `lägg till vana` / `ändra vana` / `ta bort vana` | §3b | `Q_profile` | Covering-plan writes, `activity_logged` |
+| Add/remove gym-substitution pairs with no live session, or “nu har gymmet X” | confirmation then profile write | `Q_profile` | `training-plan` session UPDATE |
+| They want a week but minimum fields are missing | this skill first, then `training-plan` | `Q_profile` | Drafting a full week from guesses |
+
 ## Before you start
 
 Read, in this order if not already in context (repo paths; from this skill folder use `../../docs/`):
@@ -24,6 +36,7 @@ Read, in this order if not already in context (repo paths; from this skill folde
 - `docs/autonomy.md`
 - `docs/provenance.md`
 - `docs/data-contracts.md`
+- `skills/_shared/queries.md`
 - `references/profile-fields.md`
 
 Use `USER_ID` from the Project instructions. Filter every query on that id.
@@ -32,14 +45,7 @@ Use `USER_ID` from the Project instructions. Filter every query on that id.
 
 ### 1. Load current state
 
-```sql
-select id, user_id, locale, timezone, week_start,
-       onboarding_status, safety_status, data, provenance
-from user_profiles
-where user_id = :USER_ID;
-```
-
-If no row, you will insert one only after the first approved confirmation.
+Run `Q_profile`. If no row, you will insert one only after the first approved confirmation.
 
 Do not re-ask confirmed fields unless the user wants to change them. Ask only for gaps.
 

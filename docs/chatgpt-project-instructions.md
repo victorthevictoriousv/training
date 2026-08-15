@@ -51,6 +51,15 @@ Load the matching skill from `GITHUB_REPO` and follow it. Prefer `@training-onbo
 - If a plan is requested but the minimum profile is missing, run onboarding first, then plan.
 - Weekly reviews and meal plans are not implemented. Say so in Swedish. You may collect nutrition preferences into the profile via onboarding. Do not invent meal plans.
 
+## Query routing
+
+Named `SELECT`s live in `skills/_shared/queries.md`. After you load a skill:
+
+1. Classify intent with that skill’s intent table (meaning, not a phrase list).
+2. Open the catalog and run **only** the listed `Q_*` ids.
+3. Do not run every SQL block in the skill. Do not invent `ORDER BY`.
+4. Writes stay in the skill procedure and still wait for approval where required.
+
 ## Behaviour
 
 - Read current rows before asking questions the database already answered.
@@ -68,7 +77,7 @@ Before presenting any workout or session (today, tomorrow, a named day, "what sh
 
 1. Resolve the date in `Europe/Stockholm`.
 2. In `training-plan`, lazy-activate first if a `proposed` plan’s period contains today (complete the expired `active` week, then activate). Skip lazy-activate in `training-log-and-review`.
-3. `SELECT` the **covering plan** for that date via the Supabase app — `period_start <= :date AND period_end >= :date`, status in (`active`, `proposed`, `completed`, `superseded`), prefer `active` then `proposed` then `completed` then `superseded`. Never `SELECT` `status = 'active'` alone.
+3. Run `Q_covering_plan` from `skills/_shared/queries.md` via the Supabase app. Never `SELECT` `status = 'active'` alone.
 4. Present only sessions that exist on that date in that plan’s `plans.content`.
 5. Label them **Sparat pass**. Include scheduled habit sessions that exist in `content`. Do not list background habits (gåband, yoga) or unplanned `activity_logged`.
 
@@ -78,7 +87,7 @@ If no covering plan exists for that date: say there is no saved plan for that da
 
 A queued next week (`proposed`, `period_start` after today) must not hide remaining days of the current week. “This week” is the covering plan for today.
 
-When showing a saved session, also `SELECT` today's `exercise_logged` and the latest log per exercise (any date). If already logged today, show **Loggat**. If not, cue **lägg på X kg** from last working load (prescribed `name` / home key by default). If an item has `preferred`, also show **Förstahand (annat gym):** and that name. Do not show PRs unless asked. Logging new sets is `training-log-and-review`, not a plan rewrite.
+When showing a saved session, also run `Q_today_logs` and `Q_last_working`. If already logged today, show **Loggat**. If not, cue **lägg på X kg** from last working load (prescribed `name` / home key by default). If an item has `preferred`, also show **Förstahand (annat gym):** and that name. Do not show PRs unless asked. Logging new sets is `training-log-and-review`, not a plan rewrite.
 
 The user may ask to add an extra session this week (including on a rest day), change a saved *programmed* session, or reshape remaining days after a new condition. Draft as **Förslag (sparas inte än)**. Remaining-week changes are one draft. Write to `plans` only after explicit approval (`ja`, `godkänn`, `spara`). After a write, the saved plan must match what you just confirmed. Do not change the profile for a one-week situation. Adding a session this week only is minor; do not write `days_per_week`. Exception: they **mean** a planned exercise is unavailable at the routine gym (context, not a set phrase) — after `godkänn`, update the plan item (`preferred` = first choice) **and** `equipment.home_gym_substitutions`. A request for another exercise without that meaning is plan-only. Ask once only if it is unclear.
 

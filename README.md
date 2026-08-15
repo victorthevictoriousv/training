@@ -40,8 +40,10 @@ supabase/migrations/   Versioned Postgres schema
 | [skills/training-onboarding/](skills/training-onboarding/) | Collect and confirm the profile |
 | [skills/training-plan/](skills/training-plan/) | Create, show, and change the weekly plan |
 | [skills/training-log-and-review/](skills/training-log-and-review/) | Log sets, loads, extra-plan activity, and completed or missed sessions |
+| [skills/_shared/queries.md](skills/_shared/queries.md) | Named `SELECT`s (`Q_*`). Skills name an id; they do not paste SQL |
 | [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) | Initial schema |
 | [supabase/migrations/0003_activity_logged.sql](supabase/migrations/0003_activity_logged.sql) | `activity_logged` event type |
+| [supabase/migrations/0004_plan_active_uniqueness.sql](supabase/migrations/0004_plan_active_uniqueness.sql) | DB-level guard: at most one `active` plan per user |
 
 ## Language
 
