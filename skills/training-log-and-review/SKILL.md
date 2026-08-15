@@ -144,6 +144,10 @@ insert into events (
 
 `:plan_id` is the active plan when the activity matches a scheduled session that day; otherwise null. Put `session_id` in the payload in that case.
 
+One user message may contain several activities (`gåband … och yoga …`). Parse each and `INSERT` one `activity_logged` per activity in the same turn.
+
+If `INSERT` fails because `type` is not allowed (`activity_logged` missing from `events_type_check`): say in Swedish that the live database is missing that event type. Do not tell them to rephrase. Do not run DDL. Do not write a substitute `type`. Do not invent a gym log for gåband or yoga.
+
 ### 4. Log the whole session
 
 Intent like `logga dagens pass`, `jag är klar`, `klart för idag`.

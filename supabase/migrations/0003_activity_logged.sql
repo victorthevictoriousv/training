@@ -22,4 +22,4 @@ create index if not exists events_activity_logged_date_idx
   where type = 'activity_logged';
 
 comment on table events is
-  'Append-only history. Do not UPDATE or DELETE. Corrections are new rows. Latest exercise_logged for user+date+exercise_key is current. Latest activity_logged for user+date+activity_key is current.';
+  'Append-only history. Do not UPDATE or DELETE. Corrections are new rows. Latest exercise_logged for user+date+exercise_key is current. Latest activity_logged for user+date+activity_key+instance is current; day load is the sum of current bouts.';

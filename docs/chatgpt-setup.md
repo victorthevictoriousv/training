@@ -5,7 +5,7 @@ v1 runtime: one ChatGPT Project, the GitHub connector, and the official Supabase
 ## 1. Supabase
 
 1. A dedicated Supabase project named `Training` already exists (`eqgfiaqqsmupbvcvcuce`, West EU / Ireland). Use that project.
-2. `0001_init.sql` and `0002_rls_and_log_events.sql` have been applied. Apply [`0003_activity_logged.sql`](../supabase/migrations/0003_activity_logged.sql) in the SQL editor if `activity_logged` is not yet in the `events` type check:
+2. `0001_init.sql`, `0002_rls_and_log_events.sql`, and [`0003_activity_logged.sql`](../supabase/migrations/0003_activity_logged.sql) have been applied. Confirm `activity_logged` is in the `events` type check:
 
 ```sql
 select pg_get_constraintdef(oid)
