@@ -1,0 +1,23 @@
+---
+description: Named Q_* reads skip the generic Supabase skill; show-saved-session is a fast path
+alwaysApply: true
+---
+
+# Training query fast path
+
+When the user only wants to **see** today / tomorrow / a named day / this week / “vad ska jag träna” (no change, no new week, no log):
+
+1. Open `skills/_shared/queries.md` only.
+2. Call `execute_sql` with `Q_lazy_activate_candidate`, then `Q_covering_plan`, `Q_today_logs`, and `Q_last_working` (plus `Q_queued_next_week` for “this week”). Filter every statement on `USER_ID` from `docs/chatgpt-project-instructions.md`.
+3. If lazy-activate returns a row, open `skills/training-plan/SKILL.md` §1 for those writes only. Otherwise do not open that skill.
+4. Present **Sparat pass** from `plans.content` for that date. Stop.
+
+Do **not**:
+
+- Read the plugin Supabase skill (CLI, RLS checklist, `search_docs`)
+- Open `docs/safety.md`, `autonomy.md`, `provenance.md`, or `data-contracts.md`
+- Open `skills/training-plan/references/*` or other skill references
+
+Chat history is a hint, not the source. If the SELECT fails, say so in Swedish. Do not invent a session.
+
+If they then ask to change the plan or draft a week, load `skills/training-plan/SKILL.md` and follow its intent-gated reads.

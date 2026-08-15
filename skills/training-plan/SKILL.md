@@ -32,7 +32,15 @@ Classify once (meaning, not a phrase list). Run only those ids from `skills/_sha
 
 ## Before you start
 
-Read if not already in context:
+Classify intent first. Then read **only** the files that row needs. Do not open the others in this turn. Do not load a generic Supabase skill to run `Q_*`.
+
+| Intent | Read now |
+| --- | --- |
+| Today / tomorrow / a named day / this week (show only) | `skills/_shared/queries.md` |
+| Swap, gym-unavailable, extra session, reshape remaining | `queries.md`, `docs/autonomy.md`, `references/minor-vs-major.md`, `references/exercise-substitutions.md`, `references/volume-and-slots.md` |
+| Draft or approve a new week | the list below |
+
+New-week list (if not already in context):
 
 - `docs/safety.md`
 - `docs/autonomy.md`
@@ -45,6 +53,8 @@ Read if not already in context:
 - `references/activity-load.md`
 - `references/volume-and-slots.md`
 - `skills/training-log-and-review/references/loads-and-prs.md`
+
+A show-only lookup that already followed the project-instruction fast path should not re-open this skill’s references.
 
 ## Procedure
 
@@ -131,6 +141,8 @@ If they request a change to a saved plan, follow "Present or change a saved sess
 ### 4. Present or change a saved session
 
 Use this whenever the user wants to see or change planned training for today, tomorrow, a named date, or the current week. Match intent, not exact wording.
+
+For **show only**, `queries.md` plus the listed `Q_*` is enough. Do not open the new-week reference list. Chat history is a hint, not the source.
 
 **Read first. Always.** Resolve the date in `Europe/Stockholm` (today unless the user named a date). Run the day-row queries from the intent table: `Q_lazy_activate_candidate` (apply §1 writes if a row), then `Q_covering_plan` for **that date**, `Q_today_logs`, and `Q_last_working`. Do not use an earlier chat message as the source of the workout. Do not use `status = 'active'` alone — that misses remaining days of a week that was superseded when the next week was saved.
 

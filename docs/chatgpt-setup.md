@@ -150,7 +150,7 @@ Expected:
 
 New chat: `Vad är dagens pass?`
 
-Expected: it runs the covering-plan SELECT for **today** (not `status = 'active'` alone), then shows only the sessions stored for today's date in that plan, labelled **Sparat pass**. If today is not in any saved week, it says there is no saved plan for that date (not a rest day, not an invented workout). If the tool fails it says so and does not invent a workout.
+Expected: it follows the show-saved-session fast path (`queries.md` + the listed `Q_*`, no constitution docs, no skill references, no generic Supabase skill). It runs the covering-plan SELECT for **today** (not `status = 'active'` alone), then shows only the sessions stored for today's date in that plan, labelled **Sparat pass**. If today is not in any saved week, it says there is no saved plan for that date (not a rest day, not an invented workout). If the tool fails it says so and does not invent a workout.
 
 Then ask to **byt** one exercise (do not say it is missing at the gym). Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in the covering plan’s `content` matches the new session and `data.equipment.home_gym_substitutions` is unchanged. Without `godkänn`, `content` is unchanged.
 

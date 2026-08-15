@@ -4,11 +4,12 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 ## How to run
 
-1. Classify intent with the skill’s intent table.
+1. Classify intent with the skill’s intent table. On the show-saved-session fast path, skip that and use the ids listed there.
 2. Open this file and copy **only** the listed ids.
 3. Replace `:USER_ID` from Project instructions. Never invent another user.
 4. Replace other `:placeholders` from the skill (`:date` is the session date in `Europe/Stockholm`; `:today` is today’s date there).
-5. Do not run other `Q_*` ids in the same turn. Do not invent `ORDER BY`. Writes stay in the skill procedure.
+5. Do not run unlisted `Q_*` ids. Do not invent `ORDER BY`. Writes stay in the skill procedure.
+6. Do not load a generic Supabase skill, CLI help, or docs search to run these. Execute the copied SQL.
 
 ---
 
