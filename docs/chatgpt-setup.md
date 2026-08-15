@@ -176,7 +176,15 @@ Expected: one habit (`treadmill_walk` or similar), `kind` `lifestyle`, `plan_inc
 
 Then: `Gick 30 min på gåbandet`.
 
-Expected: **Sparat:** … immediately (no second `godkänn`). No `session_completed`.
+Expected: **Sparat:** … immediately (no second `godkänn`). No `session_completed`. Payload `instance` 1.
+
+Then another: `Gåband 60 min 5 km/h`.
+
+Expected: a **second** `activity_logged` the same date, `instance` 2, `duration_min` 60, `speed_kmh` 5. First row unchanged. Echo not a rättelse.
+
+Then: `Gåband` with no numbers.
+
+Expected: `instance` 3 (or 1 if this is a new day), typicals from the habit, echo `(enligt vana)`.
 
 ```sql
 select type, payload

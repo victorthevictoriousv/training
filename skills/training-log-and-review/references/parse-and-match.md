@@ -59,16 +59,21 @@ If today's plan has a session with matching `habit_key` (scheduled climbing/hiki
 | Input | Meaning |
 | --- | --- |
 | `gick 30 min` | walk, `duration_min` 30, `kind` lifestyle, `intensity` easy |
-| `gåband 30 min 4,5` / `gåband 4,5 km/h 30 min` | treadmill, `duration_min` 30, `speed_kmh` 4.5 |
+| `gåband` | treadmill, one new instance; fill `typical_duration_min` / `typical_speed_kmh` from the habit; echo `(enligt vana)` |
+| `gåband 30 min 4,5` / `gåband 4,5 km/h 30 min` | treadmill, those numbers (stated values win) |
+| `gåband 60 min 5 km/h` / `gåband 60 min 5` | treadmill, `duration_min` 60, `speed_kmh` 5; not a correction of an earlier bout |
 | `promenerade 45 min` | walk, `duration_min` 45 |
 | `klättrade 2h` / `klättring 2 timmar` | climbing, `duration_min` 120, `kind` extra; complete the scheduled session if one exists that day |
 | `vandrade 12 km` | hike, `distance_km` 12, `kind` extra; ask duration if useful, do not invent it |
 | `vandrade 3h` | hike, `duration_min` 180, `kind` extra |
-| `yoga 20 min` / `yoga` / `morgonyoga` | yoga, `duration_min` if given, `kind` lifestyle, `intensity` easy; `habit_key` `yoga` if that habit exists |
+| `yoga 20 min` / `yoga` / `morgonyoga` | yoga; bare `yoga` fills typical duration from the habit when present |
+| `nej, 40 min` / `rättelse 5 km/h` | correction of the **latest** instance today, same `instance` |
 
 Comma vs decimal: `4,5` and `4.5` are the same speed. `2h` / `2 tim` → `duration_min` 120.
 
 If a confirmed habit matches (same `key` or name, e.g. gåband → `treadmill_walk`, morgonyoga → `yoga`), set `habit_key`. Otherwise `habit_key` is null and slug `activity_key` from the user text (`climbing`, `hiking`, `walk`, `yoga`).
+
+**Instances vs corrections.** Each clear log line is a new `instance` for that date + `activity_key` (1, then 2, …). `times_per_day` on the habit is the usual pattern, not a cap. Only correction language (`nej`, `rättelse`, `det var 40 min`) reuses the latest `instance`. Do not treat a longer/faster gåband as overwriting the earlier bout.
 
 Do not treat `jogg` / planned running as extra-plan activity. Planned easy-run items stay `exercise_logged`.
 
@@ -88,7 +93,15 @@ After extra-plan activity:
 
 `Sparat: Gåband 30 min, 4,5 km/h.`
 
+`Sparat: Gåband 30 min, 4,5 km/h (enligt vana).`
+
+`Sparat: Gåband 60 min, 5 km/h.`
+
 `Sparat: Klättring 120 min.`
+
+After a second bout the same day:
+
+`Sparat: Gåband 30 min, 4,5 km/h (2 idag).`
 
 After a scheduled habit session:
 

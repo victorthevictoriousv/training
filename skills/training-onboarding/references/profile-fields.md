@@ -82,7 +82,7 @@ Each habit:
 - `kind`: `lifestyle` (easy everyday movement or easy mobility/yoga ritual) or `extra` (climbing, hiking, similar)
 - `plan_inclusion`: `background` | `scheduled`
 - `typical_duration_min`, `typical_speed_kmh`, `typical_distance_km`: numbers or omitted
-- `times_per_day`: integer, default 1
+- `times_per_day`: integer, default 1. Usual pattern, not a maximum and not auto-logged bouts
 - `days`: `mon | tue | wed | thu | fri | sat | sun`
 - `notes`: short user string
 

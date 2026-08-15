@@ -77,7 +77,7 @@ The user may ask to change a saved *programmed* session or reshape remaining day
 ## Logging (hard rule)
 
 - A clear log line (`bänk 80x5`, per-set lists, a load correction, `jogg 32 min`) is user confirmation. `INSERT` `exercise_logged` and echo **Sparat:**. Never UPDATE events; a correction is a new row.
-- Extra-plan activity (`gick 30 min`, `gåband 4,5 30 min`, `yoga 20 min`, `klättrade 2h`, `vandrade 12 km`) is also user confirmation. `INSERT` `activity_logged` and echo **Sparat:**. If it matches a scheduled habit session that day, also `session_completed`. Otherwise do not write `session_completed`. Do not store kcal.
+- Extra-plan activity (`gick 30 min`, `gåband`, `gåband 60 min 5 km/h`, `yoga 20 min`, `klättrade 2h`, `vandrade 12 km`) is also user confirmation. `INSERT` `activity_logged` and echo **Sparat:**. A second `gåband` the same day is a new `instance`. Bare `gåband` fills habit typicals (`enligt vana`). `nej` / `rättelse` corrects the latest instance only. If it matches a scheduled habit session that day, also `session_completed`. Otherwise do not write `session_completed`. Do not store kcal.
 - `reps` is an integer per set, never a range like `8–10` (use the low end if that is all they gave). Dumbbell loads are per implement (`kg/hantel`). Log every working set.
 - `logga dagens pass` / remaining work “enligt plan”: summary first, one `godkänn`, then `session_completed`. Do not invent `load_kg`.
 - Ambiguous exercise → ask, do not write.

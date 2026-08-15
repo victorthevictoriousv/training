@@ -86,7 +86,7 @@ Event types:
 - `session_missed`
 - `activity_logged`
 
-Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` for that key. Current extra-plan activity for a date is the latest `activity_logged` for that `user_id + payload.date + payload.activity_key`. Do not UPDATE earlier rows. Do not store PRs in a separate table. Do not mix `activity_logged` into exercise PR or last-load queries.
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` for that key. Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Do not UPDATE earlier rows. Do not store PRs in a separate table. Do not mix `activity_logged` into exercise PR or last-load queries.
 
 ### `recommendations`
 
@@ -387,6 +387,7 @@ Lifestyle or recreational activity. Background walks and background yoga are nev
   "activity_key": "treadmill_walk",
   "activity_name": "Gåband",
   "kind": "lifestyle",
+  "instance": 1,
   "duration_min": 30,
   "distance_km": null,
   "speed_kmh": 4.5,
@@ -398,12 +399,13 @@ Lifestyle or recreational activity. Background walks and background yoga are nev
 ```
 
 - `habit_key`: matching confirmed `lifestyle.habits[].key`, or null for a one-off
+- `instance`: 1-based bout that day for this `activity_key`. A second gåband the same day is `2`. Missing on old rows means `1`
 - `kind`: `lifestyle | extra`
 - `intensity`: `easy | moderate | hard`
 - `plan_id` / `session_id`: set when the activity matches a scheduled habit session that day; otherwise null
-- Store what the user said. Do not derive `distance_km` from speed × time as a confirmed value
+- Store what the user said, or the habit `typical_*` when they named the habit with no numbers. Do not derive `distance_km` from speed × time as a confirmed value
 - Do not store kcal
-- Latest row for `user_id + date + activity_key` is current. Corrections are new rows
+- Latest row for `user_id + date + activity_key + instance` is current for that bout. Corrections (`nej`, `rättelse`) reuse `instance`. A new log line the same day without that language is a new `instance`. Sum current bouts for the day's load
 
 ## Identity in v1
 

@@ -9,7 +9,7 @@ Do not diagnose. Infer body-region stress from logged `activity_key` / habit `ke
 ## Pattern vs instance
 
 - A profile habit is not a completed walk, yoga, or climb. Never assume it was done because it sits on the profile or in `intent`.
-- Done = an `activity_logged` row for that date (and `habit_key` when it matches). Corrections are a new row; latest for `user_id + date + activity_key` wins.
+- Done = current `activity_logged` bouts for that date (`habit_key` when it matches). Each log line is a new `instance` unless they use correction language. Latest row per `user_id + date + activity_key + instance` wins. Day load is the **sum** of current instances, not the last row only. Typical habit duration/speed is a default for a bare name (`gåband`), not a cap.
 - Programming **structure** may still use the pattern: if a background yoga habit exists, do not add extra mobility sessions; if a background walk habit exists, do not add extra easy-walk slots.
 - This week's **load**, recovery credit, and (later) energy use only `activity_logged`. No logs → no credit.
 

@@ -69,7 +69,7 @@ where user_id = :USER_ID
 group by payload->>'habit_key';
 ```
 
-Current load per `exercise_key` is the first row for that key in this list (already newest-first). Current extra-plan activity per `activity_key` is the first matching `activity_logged` row.
+Current load per `exercise_key` is the first row for that key in this list (already newest-first). Current extra-plan activity is the latest row per `activity_key` + `instance` (missing `instance` = 1). Sum those current bouts for the day's load. Next new bout: `max(instance) + 1` for that date + key.
 
 If the SELECT fails: say you could not read the saved plan or logs. Do not invent a session or loads.
 
@@ -115,16 +115,18 @@ If today's plan has a session with matching `habit_key` (or the same activity na
 Otherwise (background habit or one-off):
 
 - Do not match these to planned strength/run items. Do not write `exercise_logged` or `session_completed`.
-- `INSERT` `activity_logged` immediately when the activity is unambiguous. Echo **Sparat:** in Swedish (name, duration and/or distance, speed if given).
+- `INSERT` `activity_logged` immediately when the activity is unambiguous. Echo **Sparat:** in Swedish (name, duration and/or distance, speed if given; `(enligt vana)` when typicals were filled; `(N idag)` when `instance` > 1).
 - `plan_id` / `session_id` are null.
 
 Shared rules:
 
 - Set `habit_key` when the activity matches a confirmed habit `key` or name; otherwise `habit_key` is null.
+- Set `instance`: new bout = one more than today's max for that `activity_key` (start at 1). Correction language (`nej`, `rättelse`) keeps the latest `instance`.
+- If they named a habit with no numbers, copy `typical_duration_min` / `typical_speed_kmh` / `typical_distance_km` from the habit into the payload and echo `(enligt vana)`. Stated numbers always win. If only duration or only speed is stated, fill the omitted typical when present.
 - `kind`: `lifestyle` for easy everyday movement (walk, treadmill, commute) or easy yoga/mobility; `extra` for climbing, hiking, and similar load.
-- `intensity`: `easy | moderate | hard`. Default `easy` for ordinary walking. Ask once if a hike or climb intensity is unclear.
-- Store only what they said. Do not invent `distance_km` from speed × time. Do not store kcal.
-- Correction of today's activity (`nej, 40 min`) → another `activity_logged` for the same `activity_key`. Latest for that date + key is current.
+- `intensity`: `easy | moderate | hard`. Default `easy` for ordinary walking (including 5 km/h treadmill). Ask once if a hike or climb intensity is unclear.
+- Store only what they said or the typicals just above. Do not invent `distance_km` from speed × time. Do not store kcal.
+- `times_per_day` is not a maximum and not auto-completed. Two `gåband` lines the same day are two instances.
 - A new recurring pattern (`jag går alltid 2×30 min arbetsdagar`, `jag klättrar onsdagar`) is a profile habit: switch to `training-onboarding`. Still log today's instance here if they also reported doing it.
 
 ```sql

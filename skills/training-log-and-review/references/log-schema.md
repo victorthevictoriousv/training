@@ -53,6 +53,7 @@ Extra-plan lifestyle or recreational activity. Not a planned session.
   "activity_key": "treadmill_walk",
   "activity_name": "Gåband",
   "kind": "lifestyle",
+  "instance": 1,
   "duration_min": 30,
   "distance_km": null,
   "speed_kmh": 4.5,
@@ -65,18 +66,25 @@ Extra-plan lifestyle or recreational activity. Not a planned session.
 
 - `activity_key`: lowercase snake_case, stable. Prefer the matching habit `key` when one exists.
 - `habit_key`: that habit `key`, or null for a one-off.
+- `instance`: 1-based bout on that date for this `activity_key`. Default `1` if omitted (older rows). A second gåband the same day is `instance` 2, not a correction.
 - `kind`: `lifestyle` (easy everyday movement or easy yoga/mobility) or `extra` (climbing, hiking, similar).
 - `intensity`: `easy | moderate | hard`. Default `easy` for ordinary walking.
-- `duration_min`, `distance_km`, `speed_kmh`, `rpe`: numbers or null. Store only values the user stated. Do not derive distance from speed × time. Do not store kcal.
+- `duration_min`, `distance_km`, `speed_kmh`, `rpe`: numbers or null. Store only values the user stated, or the matching habit's `typical_*` when they named the habit without numbers. Do not derive distance from speed × time. Do not store kcal.
 - `activity_name`: user-facing, may be Swedish.
 - `plan_id` / `session_id`: set when this matches a scheduled habit session that day; otherwise omit or null.
 
-One-off climbing example: `{ "habit_key": null, "activity_key": "climbing", "activity_name": "Klättring", "kind": "extra", "duration_min": 120, "intensity": "moderate" }`.
+Typical-from-habit: `gåband` with no numbers → `duration_min` / `speed_kmh` from `typical_duration_min` / `typical_speed_kmh`. Echo `(enligt vana)`. Stated numbers always win (`gåband 60 min 5 km/h` stores 60 and 5.0). If they state only duration or only speed, fill the omitted one from the habit typical when present.
+
+One-off climbing example: `{ "habit_key": null, "activity_key": "climbing", "activity_name": "Klättring", "kind": "extra", "instance": 1, "duration_min": 120, "intensity": "moderate" }`.
 
 Scheduled climbing the same day as a plan session: set `plan_id` and `session_id`, and also write `session_completed`.
 
-A confirmed habit on the profile is not an instance. Yoga and gåband count only after this event exists for that date.
+A confirmed habit on the profile is not an instance. Yoga and gåband count only after this event exists. `times_per_day` is the usual pattern, not a max and not auto-filled bouts.
 
 ## Current value
 
-Latest `exercise_logged` for (`user_id`, `date`, `exercise_key`) wins. Latest `activity_logged` for (`user_id`, `date`, `activity_key`) wins. Older rows stay for history.
+Latest `exercise_logged` for (`user_id`, `date`, `exercise_key`) wins.
+
+Latest `activity_logged` for (`user_id`, `date`, `activity_key`, `instance`) wins. Treat missing `instance` as `1`. Older rows stay for history. Load for the day is the **sum** of current instances (e.g. two gåband bouts), not only the last row.
+
+Correction language (`nej, 40 min`, `rättelse`) writes a new row with the **same** `instance` as the latest bout. A second `gåband` the same day without that language is a new `instance`.
