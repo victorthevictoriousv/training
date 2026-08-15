@@ -34,7 +34,7 @@ Normalize: lowercase, strip diacritics, treat `-` and spaces as nothing (`pull-u
 
 1. Prefer a unique planned item for that date. Match `name`, aliases, **or** `preferred.name` / `preferred.key` when present.
 2. If several items match, ask.
-3. If none match but the name is a clear exercise, log it anyway with a slug from the user text (`session_id` null unless only one session that day).
+3. If none match but the name is a clear exercise, log it anyway with a slug from the user text. `session_id` is **null** even if the day has exactly one planned session of another kind (do not attach extra goblet to evening intervals). `plan_id` may still be the active plan. Do not write `session_completed`.
 
 When matched:
 
@@ -98,7 +98,7 @@ Match intent. Do not require these exact strings. This is not a single-exercise 
 
 Not this path: `bänk 80x5` (immediate log), `hoppade över`, `resten enligt plan` (mark done **without** weights).
 
-Fill rules: last working kg/`load_text` (not PR, not plan RPE, no auto-bump); today's planned sets; last per-set reps if set count matches, else planned low end. Ask all missing weights in one message before the card. Default home `name`/`key`; mention `preferred` on the card. Skip warmup. Skip already-logged items.
+Fill rules: last working kg/`load_text` (not PR, not plan RPE, no auto-bump); today's planned sets; last per-set reps if set count matches, else planned low end. Ask all missing weights in one message before the card. Default home `name`/`key`; mention `preferred` on the card. Skip warmup. Skip already-logged items. This path does not apply when today has no planned strength session — then log exercise by exercise, or add the session via `training-plan` first.
 
 ## Echo
 

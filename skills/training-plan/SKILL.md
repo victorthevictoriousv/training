@@ -1,6 +1,6 @@
 ---
 name: training-plan
-description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, reshaping the rest of the week, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, or meal plans.
+description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, adding an extra session this week (including on a rest day), reshaping the rest of the week after a new condition, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, or meal plans. If they already did extra work, log it first, then return here only if they want remaining days adapted.
 ---
 
 # training-plan
@@ -154,21 +154,23 @@ Keep the latest row per `payload.exercise_key` for today, and use the second que
 - If not yet logged and no history: RPE only; do not invent kg.
 - Do not show PR unless asked. For “hur går det” / results, use `training-log-and-review`.
 - If they ask for a PR, load `training-log-and-review` and `loads-and-prs.md`.
-- If they are reporting what they lifted, walked, climbed, or hiked, switch to `skills/training-log-and-review/SKILL.md`. Do not treat a log line as a plan rewrite.
-- Do not list background habits or unplanned `activity_logged` as **Sparat pass**. Scheduled habit sessions that are in `content` are **Sparat pass**.
+- If they are reporting what they lifted, walked, climbed, or hiked, switch to `skills/training-log-and-review/SKILL.md`. Do not treat a log line as a plan rewrite. If they also asked to adapt remaining days, log first, then continue here with one remaining-week draft.
+- Do not list background habits or unplanned `activity_logged` as **Sparat pass**. Scheduled habit sessions that are in `content` are **Sparat pass**. Unplanned gym (`exercise_logged` with `session_id` null) is also not **Sparat pass**.
 
-If they want to change an exercise, a day, or reshape remaining days after a skip, time pressure, or poor recovery:
+If they want to add an extra session, change an exercise or a day, or reshape remaining days after a skip, time pressure, poor recovery, extra work already done, or another new condition:
 
-1. Classify exercise-change intent with `references/exercise-substitutions.md` (gym-unavailable vs this-week swap). Use the meaning of the message, not a phrase list. Ask once only if unclear.
-2. Draft as **Förslag (sparas inte än)** with a short before/after. Gym-unavailable: one substitute, keep the original as first choice on the card. If they asked to reshape the rest of the week, draft **remaining days in one card**, not pass-by-pass questions.
-3. Wait for explicit approval (`ja`, `godkänn`, `spara`).
-4. Classify using `references/minor-vs-major.md`.
-5. Minor, one day: `UPDATE` the active row's `content` so that day's `sessions` match the approved draft. Keep the rest of the week unchanged unless the draft also changed later days.
-6. Minor, gym-unavailable: same plan `UPDATE`, **and** merge the pair into `data.equipment.home_gym_substitutions` (full array, keep unrelated pairs), insert `profile_updated`, set provenance `equipment.home_gym_substitutions`. Tell them both were saved.
-7. Minor, remaining week: `UPDATE` `content` so all drafted days match. Do not change the profile unless the same turn also confirmed gym-unavailable pairs.
-8. This-week swap: `UPDATE` `content` only. Do not set `preferred`. Do not write the profile.
-9. Major: do not UPDATE in place. Follow step 5 (new week) after approval.
-10. If they do not approve: leave the database unchanged.
+1. Classify intent: **add to this week** (program a new session) vs **reshape remaining** (adapt days already planned) vs they only reported work already done (that is `training-log-and-review` only). Ask once only if unclear. Classify exercise-change intent with `references/exercise-substitutions.md` (gym-unavailable vs this-week swap). Use the meaning of the message, not a phrase list.
+2. Draft as **Förslag (sparas inte än)** with a short before/after. Gym-unavailable: one substitute, keep the original as first choice on the card. If they asked to reshape the rest of the week, or to add a session that affects later days, draft **remaining days in one card**, not pass-by-pass questions.
+3. Apply `references/volume-and-slots.md`: never hard + hard; no quality run after heavy lower body the same day. If they add or already logged lunch lower body on a quality-run day, the draft swaps that quality run to 30–40 min easy jogging unless they clearly insist on both — then warn and still do not program hard + hard. Easy upper or mobility lunch may keep the evening quality run; one fueling line as inference. Easy gåband or yoga does not drop the quality run.
+4. Adding a session this week (two-a-day, or work on a rest day with empty `sessions`) is minor when the profile is unchanged. Do not write `days_per_week`.
+5. Wait for explicit approval (`ja`, `godkänn`, `spara`).
+6. Classify using `references/minor-vs-major.md`.
+7. Minor, one day: `UPDATE` the active row's `content` so that day's `sessions` match the approved draft. Keep the rest of the week unchanged unless the draft also changed later days.
+8. Minor, gym-unavailable: same plan `UPDATE`, **and** merge the pair into `data.equipment.home_gym_substitutions` (full array, keep unrelated pairs), insert `profile_updated`, set provenance `equipment.home_gym_substitutions`. Tell them both were saved.
+9. Minor, remaining week: `UPDATE` `content` so all drafted days match. Do not change the profile unless the same turn also confirmed gym-unavailable pairs.
+10. This-week swap: `UPDATE` `content` only. Do not set `preferred`. Do not write the profile.
+11. Major: do not UPDATE in place. Follow the new-or-replacement week write below after approval.
+12. If they do not approve: leave the database unchanged.
 
 Skipping today's session without asking to move or reshape it is `training-log-and-review` (`session_missed`). Do not auto-raise another session to hard.
 

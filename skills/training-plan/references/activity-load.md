@@ -42,9 +42,9 @@ This is a nudge, not `training-nutrition` and not a weekly review.
 2. Background habits: one Swedish line in `intent` as pattern, not as done, e.g. `Vanor (räknas när du loggar): gåband 2×30 min arbetsdagar, yoga vardagar.`
 3. Scheduled habits: add a session on those weekdays (`modality` `other`, `habit_key`, duration from the habit). Do not add `other` to top-level `content.modalities`. Still do not mark them completed until `activity_logged` / `session_completed`.
 4. If a background walk habit exists, do not program extra easy-walk recovery slots. If a background yoga/mobility habit exists, do not program extra mobility sessions. Prefer full rest (no gym/run) for the recovery day. Do not credit those habits as this week's load unless logged.
-5. For scheduled extra habits and for unplanned `activity_logged` of `kind` extra: keep that weekday and the following morning lighter for the patterns below.
+5. For scheduled extra habits, unplanned `activity_logged` of `kind` extra, and unmatched `exercise_logged` (extra gym): keep that weekday and the following morning lighter for the patterns below. Extra lower body the same day as a quality run: offer to swap that run to easy jogging; do not keep both in a remaining-week draft.
 6. Easy background walking and easy background yoga do not reduce strength or running **days**. They also do not require a two-a-day.
-7. Do not invent a scheduled session for a one-off climb/hike unless the user asks to put it in the week.
+7. Do not invent a scheduled session for a one-off climb/hike or extra gym unless the user asks to put it in the week.
 8. If the habit catch-up in this file applies, ask with their habit names before treating last week's load as known.
 
 ## Default inferences (not facts)
@@ -58,9 +58,21 @@ This is a nudge, not `training-nutrition` and not a weekly review.
 
 Unknown activity: treat duration + `intensity` only. Ask once if `kind` is unclear. Default unknown easy walks to `lifestyle`; default climbing/hiking to `extra`.
 
+## Unplanned gym (`exercise_logged`)
+
+An `exercise_logged` that does not match a planned item that day is extra gym load, not a new session unless they ask to put it in the week (`training-plan`).
+
+- `session_id` is null. Do not treat it as completing the day's other session. Do not write `session_completed` for it.
+- Infer region from the exercise (squat, RDL, lunge, leg press → lower body; press, row, pull-up → upper). Label as slutsats. Do not write `load_regions`.
+- Extra lower body the same day as a remaining quality run: do not auto-rewrite. Offer to swap the quality run to 30–40 min easy jogging (`training-plan`). Wait for `godkänn`.
+- Easy upper or mobility can stack with an evening quality run. One fueling line as inference.
+- Easy background yoga or gåband does not trigger this and does not drop the quality run.
+
+When drafting or reshaping this week, also read today's unmatched `exercise_logged`. Same load caution as unplanned `activity_logged` of `kind` extra for the region inferred.
+
 ## Presenting a saved day
 
-Show `plans.content` sessions as **Sparat pass**, including scheduled habit sessions. Do not append background walks or background yoga to that list.
+Show `plans.content` sessions as **Sparat pass**, including scheduled habit sessions. Do not append background walks, background yoga, or unplanned gym (`exercise_logged` with `session_id` null) to that list.
 
 ## Nutrition later
 

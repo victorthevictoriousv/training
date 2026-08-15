@@ -37,6 +37,15 @@ Pair work + easy, never two hard sessions. Set `slot` on each session when the w
 
 Do not fill every window every day.
 
+## Mid-week extra session
+
+These rules apply when adding or logging extra work on an already active week, not only when first drafting.
+
+- Extra session this week (including on a rest day) stays inside this week. Do not write `days_per_week`. That is minor reshape, not a new normal.
+- Easy upper or mobility lunch can stack with an evening quality run. One fueling line. Keep the quality run.
+- Extra lower-body strength the same day as a quality run: the draft must not keep both. Swap the quality run to 30–40 min easy jogging unless they insist; never program hard + hard. Do not auto-write because they logged extra. Offer the swap; wait for `godkänn`.
+- Gåband or yoga is background; do not add a session and do not drop the quality run for that alone.
+
 ## Experience when fields are missing
 
 - Confirmed `experience.*` for a selected modality wins

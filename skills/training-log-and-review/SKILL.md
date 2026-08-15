@@ -1,6 +1,6 @@
 ---
 name: training-log-and-review
-description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), a load correction, a PR question, how an exercise is progressing, or catching up habits after a quiet week. Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, or asks for last weights, personal bests, or results. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, run weekly reviews, or give meal plans.
+description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, or catching up habits after a quiet week. Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, or asks for last weights, personal bests, or results. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, run weekly reviews, or give meal plans. If they also want extra work put in the week or remaining days adapted, log first, then load training-plan.
 ---
 
 # training-log-and-review
@@ -9,12 +9,23 @@ Record what actually happened. Do not invent loads. Weekly review is not impleme
 
 ## Do not
 
-- Create or rewrite the weekly plan (load `training-plan`)
+- Create or rewrite the weekly plan (load `training-plan`). Log first if they already did the work; do not UPDATE `plans` here
 - Save a recurring habit to the profile (load `training-onboarding`)
 - Invent kilogram values the user did not state or confirm on the shortcut card (copied last working after one `godkänn` is allowed)
 - Store kcal, MET, or TDEE
 - UPDATE or DELETE `events`
 - Run DDL or weekly reviews
+- Attach unmatched gym work to another session the same day, or write `session_completed` for extra work that is not in `content`
+- Auto-rewrite remaining days because they logged extra. Offer a reshape if it conflicts; wait
+
+## Extra session vs plan change
+
+If the message is extra or unplanned work, or a new condition, classify intent (meaning, not a phrase list):
+
+- **Log only** — they report what already happened. Write the event here. Leave the plan unchanged.
+- **Add to this week** / **reshape remaining** — they want it programmed or remaining days adapted. Log any work they already did, then load `training-plan` for one remaining-week draft. Do not log a future session as done.
+
+`logga gympasset` only fills a *planned* strength session. If today has no planned gym, log exercise by exercise, or they add the session via `training-plan` first.
 
 ## Before you start
 
@@ -79,7 +90,7 @@ A profile habit is not done until `activity_logged`. If habit catch-up in `activ
 
 If the message is (or includes) an exercise + load and/or reps, parse with `references/parse-and-match.md`.
 
-- One clear match to today's planned items (`name` or `preferred.name`), or a clear new accessory: `INSERT` `exercise_logged` immediately. Echo **Sparat:** in Swedish (exercise, sets, kg, reps). Use the home `key` when they logged the prescribed name; use `preferred.key` when they logged the first-choice.
+- One clear match to today's planned items (`name` or `preferred.name`), or a clear accessory of that same planned session: `INSERT` `exercise_logged` immediately. Echo **Sparat:** in Swedish (exercise, sets, kg, reps). Use the home `key` when they logged the prescribed name; use `preferred.key` when they logged the first-choice. Extra gym that is not an accessory of a planned strength session that day is unmatched (`session_id` null).
 - `reps` must be an integer or null. Never write a range or `reps_text`. Range-only input → low end, and say so in the echo.
 - Dumbbell `load_kg` is per implement (`30 kg/hantel`).
 - Store one object per working set (4×8 → four sets of 8), not a single set.
@@ -99,7 +110,7 @@ insert into events (
 );
 ```
 
-`plan_id` / `session_id` may be null if there is no active plan; still log if the exercise is unambiguous.
+`plan_id` may be the active plan when one exists. `session_id` is set only when the exercise matches a planned item that day (or is a clear accessory of that same session). If nothing planned matches, `session_id` is null even if the day has exactly one other session (do not attach extra goblet to evening intervals). Still log if the exercise is unambiguous. Do not write `session_completed` for unmatched extra gym.
 
 ### 3. Extra-plan activity and scheduled habit sessions
 
@@ -207,6 +218,8 @@ If they ask for a PR, last weight, how an exercise is going, or similar: use `re
 ### 7. After a write
 
 Swedish, one or two lines. Offer the next planned exercise if any remain. After `activity_logged`, do not offer gym exercises unless they were already mid-session. Do not dump JSON. Do not mention PR unless they just asked or you need it to choose a weight. Do not mention kcal.
+
+If you just logged extra lower-body strength (unmatched to today's plan, or they said it was extra gym) and that date still has a planned quality run that is not completed: in the same turn, say in Swedish that quality running should not follow heavy lower body, and offer to swap it to 30–40 min easy jogging. Do not UPDATE the plan unless they then ask; that is `training-plan`. Easy gåband or yoga does not trigger this.
 
 ## Dialogue
 
