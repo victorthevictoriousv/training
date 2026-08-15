@@ -20,9 +20,10 @@ See also `docs/data-contracts.md`.
 
 - `exercise_key`: lowercase snake_case, stable. Prefer the planned item name slug when matched.
 - `load_kg`: number when known. Null for bodyweight, time carries, or duration-only work.
-- `load_text`: always set (`24 kg`, `kroppsvikt`, `+12 kg`, `30 s`).
-- `reps`: integer or null for timed work.
+- `load_text`: always set (`24 kg`, `kroppsvikt`, `+12 kg`, `32 min`).
+- `reps`: integer or null for timed or distance work.
 - `rpe`: number or null.
+- `duration_min` / `distance_km`: for running or timed work; `load_kg` is then null.
 - Several working sets: one event with several objects in `sets`.
 
 ## `session_completed` / `session_missed`

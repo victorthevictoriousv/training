@@ -85,7 +85,7 @@ Event types:
 - `session_completed`
 - `session_missed`
 
-Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Do not UPDATE earlier rows.
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` for that key. Do not UPDATE earlier rows. Do not store PRs in a separate table.
 
 ### `recommendations`
 
@@ -303,6 +303,8 @@ Block items are intentionally loose in v1:
   "raw_text": "bänk 80x5"
 }
 ```
+
+Running set example: `{ "load_kg": null, "load_text": "32 min", "reps": null, "rpe": 3, "duration_min": 32, "distance_km": null }`.
 
 `session_completed` / `session_missed`
 

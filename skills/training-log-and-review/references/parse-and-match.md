@@ -14,8 +14,9 @@ Treat `x` and `×` the same. Ignore `kg` as a unit token.
 | `pullups 12kg 6,6,5,5` | 4 sets, 12 kg, those reps |
 | `bänk 80x5, 80x5, 82.5x4` | 3 sets, listed loads/reps |
 | `bänk 82.5` | correction: all working sets today at 82.5 kg, keep last known reps if any, else ask reps only if never logged |
-| `jogg 32 min` | running, duration 32, `load_kg` null, `load_text` `32 min` |
-| `farmer 40 kg 40s` | timed, `reps` null, `load_text` includes seconds |
+| `jogg 32 min` | running, `duration_min` 32, `load_kg` null |
+| `10 km 52 min` | running, `distance_km` 10, `duration_min` 52 |
+| `farmer 40 kg 40s` | timed, `reps` null, `duration_min` ~0.7 or `load_text` `40 s` |
 
 If RPE is present (`RPE 8`, `@8`), store it on those sets.
 
@@ -52,3 +53,5 @@ After a successful insert, one line:
 After a correction:
 
 `Sparat: Hantelpress 82.5 kg (uppdaterad vikt idag).`
+
+Do not add a PR line unless they asked.

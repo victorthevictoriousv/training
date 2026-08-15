@@ -38,7 +38,7 @@ v1 implements:
 - RLS enabled with no anon policies (Data API denied)
 - `training-onboarding`
 - `training-plan` for the weekly plan and showing saved sessions
-- `training-log-and-review` for exercise and session logging (not weekly review)
+- `training-log-and-review` for exercise and session logging (not weekly review). PRs are derived from logs and used to pick loads; they are not shown unless asked.
 
 v1 does not implement:
 

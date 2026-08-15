@@ -1,6 +1,6 @@
 ---
 name: training-log-and-review
-description: Log completed or missed training — a single exercise with weight and reps, today's whole session, or a correction to a logged load. Use whenever the user reports what they lifted, ran, skipped, or finished. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile data, run weekly reviews, or give meal plans.
+description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, a load correction, a PR question, or how an exercise is progressing. Use whenever the user reports what they lifted or ran, skips a session, or asks for last weights, personal bests, or results. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile data, run weekly reviews, or give meal plans.
 ---
 
 # training-log-and-review
@@ -24,6 +24,7 @@ Read if not already in context:
 - `docs/data-contracts.md`
 - `references/log-schema.md`
 - `references/parse-and-match.md`
+- `references/loads-and-prs.md`
 
 ## Procedure
 
@@ -103,9 +104,13 @@ One `session_completed` (or `session_missed`) per planned `session_id` on that d
 
 Clear skip (`hoppade över`, `kunde inte träna idag`): insert `session_missed`, echo **Sparat:**. If it is unclear which session, ask once.
 
-### 5. After a write
+### 5. PR, last weight, or results (only when asked)
 
-Swedish, one or two lines. Offer the next planned exercise if any remain. Do not dump JSON.
+If they ask for a PR, last weight, how an exercise is going, or similar: use `references/loads-and-prs.md`. Answer that exercise (or a short list if they asked generally). Do not volunteer PRs or full histories on ordinary logs or “dagens pass”.
+
+### 6. After a write
+
+Swedish, one or two lines. Offer the next planned exercise if any remain. Do not dump JSON. Do not mention PR unless they just asked or you need it to choose a weight.
 
 ## Dialogue
 

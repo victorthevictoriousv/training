@@ -26,6 +26,7 @@ Read if not already in context:
 - `docs/data-contracts.md`
 - `references/plan-schema.md`
 - `references/minor-vs-major.md`
+- `skills/training-log-and-review/references/loads-and-prs.md`
 
 ## Procedure
 
@@ -42,7 +43,16 @@ where user_id = :USER_ID
   and status = 'active'
 order by created_at desc
 limit 1;
+
+select distinct on (payload->>'exercise_key')
+  payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type = 'exercise_logged'
+order by payload->>'exercise_key', occurred_at desc;
 ```
+
+Use last working loads when drafting or showing sessions (`skills/training-log-and-review/references/loads-and-prs.md`). Do not print PRs unless asked.
 
 If no profile row, or any minimum field from `skills/training-onboarding/references/profile-fields.md` is missing, switch to `training-onboarding`. Do not draft a full week from guesses.
 
@@ -71,8 +81,8 @@ Programming rules (v1, not a periodization engine):
 - At least one recovery-oriented slot if `recovery` is a selected modality or if days per week ≥ 4 (easy walk, mobility, or full rest)
 - Combine modalities across the week, not all in one session unless the user asked for a short combo day
 - If only one modality was selected, the whole week may be that modality plus rest days
-- Strength: compound lifts first, named sets/reps/RPE
-- Running: easy / quality / long as fits experience; no expert race plan
+- Strength: compound lifts first, named sets/reps/RPE. Fill suggested kg from last working loads per `loads-and-prs.md`.
+- Running: easy / quality / long as fits experience; use last duration/distance, not running PRs, as the default target.
 - Mobility: short named drills with minutes
 - Recovery: explicit rest or easy work, not hidden intensity
 
@@ -86,7 +96,7 @@ Use this whenever the user wants to see or change planned training for today, to
 
 **Read first. Always.** Run the `SELECT` in step 1 in this turn. Do not use an earlier chat message as the source of the workout.
 
-Also load today's logs (do not skip this when presenting a day):
+Also load today's logs and last working loads (do not skip this when presenting a day):
 
 ```sql
 select payload, occurred_at
@@ -95,16 +105,27 @@ where user_id = :USER_ID
   and type = 'exercise_logged'
   and payload->>'date' = :date
 order by occurred_at desc;
+
+select distinct on (payload->>'exercise_key')
+  payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type = 'exercise_logged'
+order by payload->>'exercise_key', occurred_at desc;
 ```
 
-Keep the latest row per `payload.exercise_key`.
+Keep the latest row per `payload.exercise_key` for today, and use the second query as last working weight.
 
 - If the Supabase tool fails or returns an error: say in Swedish that you could not read the saved plan. Stop. Do not invent a session.
 - If there is no `active` plan: say so and offer to create a week (step 2–3). Do not invent a session.
 - Resolve the date in `Europe/Stockholm` (today unless the user named a date). Find that date in `content.days`.
 - If `sessions` is empty: tell them the saved plan has rest that day.
 - Otherwise present those sessions in Swedish as **Sparat pass**. Mention the plan title and date. Do not add exercises that are not in `content`.
-- Next to matching exercises, show **Loggat** from the latest log (kg × reps). Planned load stays visible if no log exists.
+- If already logged today: show **Loggat** (kg × reps).
+- If not yet logged and last working kg exists: show **lägg på X kg**.
+- If not yet logged and no history: RPE only; do not invent kg.
+- Do not show PR unless asked. For “hur går det” / results, use `training-log-and-review`.
+- If they ask for a PR, load `training-log-and-review` and `loads-and-prs.md`.
 - If they are reporting what they lifted, switch to `skills/training-log-and-review/SKILL.md`. Do not treat a log line as a plan rewrite.
 
 If they want to change that day:
