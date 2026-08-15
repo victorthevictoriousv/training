@@ -1,6 +1,6 @@
 ---
 name: training-onboarding
-description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, or life constraints, or they ask to update the profile. Do not use to create weekly plans, log sessions, or give meal plans.
+description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, or they ask to update the profile. Do not use to create weekly plans, log sessions or extra-plan activity instances, or give meal plans.
 ---
 
 # training-onboarding
@@ -10,10 +10,10 @@ Collect profile data, run a safety screen, and write confirmed facts only after 
 ## Do not
 
 - Create or activate weekly plans (hand off to `training-plan`)
-- Invent meal plans or session logs
+- Invent meal plans, session logs, or `activity_logged` rows (instances belong in `training-log-and-review`)
 - Diagnose, or advise on medication
 - Write `user_profiles.data` before the user approves the summary
-- Store AI conclusions as profile facts
+- Store AI conclusions, kcal, MET, or TDEE as profile facts
 
 ## Before you start
 
@@ -59,13 +59,35 @@ If proposed status is `stop`, tell the user to seek care. You may still save a c
 Ask 2–4 questions per turn. Prefer this order after screening:
 
 1. Primary goal and modalities they want in the week
-2. Experience per selected modality
-3. Days per week, preferred days, minutes per session
+2. Experience per selected modality (do not skip this)
+3. Training **days** per week (not session count); which windows usually exist (lunch / evening / morning) and roughly how long; whether two sessions the same day is fine on *some* days (`two_a_day: some_days` if yes). Do not ask them to design the week or pick a gym+run quota
 4. Location and equipment
 5. Injuries/pain in their own words (observation + confirmed health lists)
-6. Optional: sleep, stress, schedule, nutrition preferences (allergies/exclusions only)
+6. Optional: sleep, stress, schedule, nutrition preferences (allergies/exclusions only). If they confirmed high volume willingness or `two_a_day: some_days`, ask sleep/stress in this cluster (still optional to save)
 
-Stop when the minimum plan fields in `references/profile-fields.md` are ready, unless the user wants to continue.
+If they say training is a hobby or they like training a lot, put that in `goals.notes` as their words. Do not invent elite volume tolerance.
+
+When the minimum plan fields in `references/profile-fields.md` are ready, go to step 3b before the confirmation card. Sleep, stress, and nutrition stay optional. Habits are also optional to *save*, but the question in 3b is asked once. `windows`, `two_a_day`, and `anchor` are optional to save but should be asked in step 3 when those gaps exist.
+
+### 3b. Habits (once, after the plan minimum)
+
+If `lifestyle.habits` is not yet confirmed, ask once in Swedish:
+
+> Gör du något regelbundet utöver träningspassen — vardagsmotion eller annat, till exempel gåband, promenad, yoga, klättring eller vandring?
+
+- `nej` / `hoppa` / `sen` → omit `lifestyle.habits`. Do not save an empty array.
+- If yes: ask what, which days, typical duration (and speed/distance only if they give it). A few questions, not a form.
+- `kind`: `lifestyle` for easy everyday movement (gåband, commute walk) or easy mobility/yoga; `extra` for climbing, hiking, similar.
+- `plan_inclusion`: default `background` for `lifestyle` (including yoga). For `extra` with named weekdays, ask whether it should sit in the weekly plan as a pass; suggest `scheduled`. For `extra` without days, default `background`.
+- Propose the habit list on the confirmation card. Wait for `godkänn`.
+
+`lägg till vana` / `ändra vana` / `ta bort vana` at any later time: load current `habits`, draft the merged list, confirm, then `profile_updated`. Keep unrelated habits. Provenance key is `lifestyle.habits` for the whole array.
+
+A one-off without a pattern is not a habit — load `training-log-and-review` for that instance.
+
+If they both confirm a habit and report doing it today, save the habit here, then log today's instance with `training-log-and-review`.
+
+Tell them in Swedish that the vana is the pattern; each time they do it they still say so (e.g. `yoga`, `gåband 30 min`) so it can be logged. Do not claim they already did it.
 
 ### 4. Show a confirmation card
 
@@ -94,7 +116,7 @@ Then insert `user_profiles` with:
 
 **Later save (row exists):**
 
-Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never delete unrelated confirmed keys unless the user asked to remove them.
+Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits`, write the full confirmed array (add, change, or remove items they approved).
 
 Do not UPDATE `events`.
 
@@ -136,4 +158,4 @@ insert into user_profiles (
 
 ## Dialogue
 
-Speak Swedish. Be brief. One cluster of questions per turn. Never claim medical clearance.
+Speak Swedish. Be brief. One cluster of questions per turn. Never claim medical clearance. Do not design the weekly plan here — collect capacity, then hand off to `training-plan`.

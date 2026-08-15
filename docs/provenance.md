@@ -39,6 +39,7 @@ Inference (do not save as profile fact):
 | New plan after approval | `plan_proposed` then `plan_activated` |
 | Replacing an active plan | `plan_superseded` on the old plan, then proposed + activated on the new |
 | Exercise log or weight correction | `exercise_logged` (append; latest wins) |
+| Extra-plan activity or a correction of it | `activity_logged` (append; latest for date + `activity_key` wins) |
 | Finished or skipped session | `session_completed` or `session_missed` |
 
 Insert events; never update or delete them.

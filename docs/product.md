@@ -9,7 +9,7 @@ The long-term product should:
 - build and adapt plans for strength, running/conditioning, mobility/yoga, and recovery
 - combine those modalities into one weekly plan
 - account for goals, experience, time, equipment, injuries, health, recovery, and life context
-- log sessions, results, body weight, personal bests, perceived effort, and other observations
+- log sessions, results, extra-plan activity (everyday movement, climbing, hiking), body weight, personal bests, perceived effort, and other observations
 - track progress over time
 - adapt after missed sessions, illness, time pressure, travel, poor recovery, or other changes
 - give simple meal suggestions tied to goals, training, and preferences
@@ -37,8 +37,8 @@ v1 implements:
 - four tables: `user_profiles`, `plans`, `events`, `recommendations`
 - RLS enabled with no anon policies (Data API denied)
 - `training-onboarding`
-- `training-plan` for the weekly plan and showing saved sessions
-- `training-log-and-review` for exercise and session logging (not weekly review). PRs are derived from logs and used to pick loads; they are not shown unless asked.
+- `training-plan` for the weekly plan and showing saved sessions. Background habits stay out of `plans.content` and count only when logged (`activity_logged`). Scheduled habits (e.g. climbing on a named weekday) become `other` sessions with `habit_key`. Same-day stacking is allowed on some days when the profile says so; it is not a 5+5 template
+- `training-log-and-review` for exercise and session logging plus extra-plan activity (not weekly review). PRs are derived from `exercise_logged` only; they are not shown unless asked
 
 v1 does not implement:
 
@@ -58,19 +58,19 @@ Four skills are in scope for the product. Nutrition is still a stub; weekly revi
 
 ### `training-onboarding`
 
-Collects profile data progressively, identifies missing fields for later capabilities, runs a basic safety screen, and updates the profile after explicit approval. Does not create weekly plans or meal suggestions. If `safety_status` is `stop`, it must refuse training-plan handoff.
+Collects profile data progressively, including optional `lifestyle.habits`. After the plan minimum it asks once about recurring everyday movement, yoga, or extra sports. Collects training **days**, possible windows, and whether two sessions the same day is fine on some days — not a weekly gym+run quota. Habits can be added, changed, or removed later after approval. Does not create weekly plans or meal suggestions. If `safety_status` is `stop`, it must refuse training-plan handoff.
 
 ### `training-plan`
 
-Creates and changes weekly plans across the modalities the user actually chose. Reads confirmed profile data and, when showing a day, the latest logs for that date. Writes `plans` and plan events. Does not log completed sets.
+Creates and changes weekly plans across the modalities the user actually chose. Reads confirmed profile data, lifestyle habits, and recent extra-plan activity. Lays out the week from capacity (windows, `two_a_day`, experience); recovery is a hard gate. Background habits stay in `intent` as a pattern and count only when logged. Scheduled habits become sessions (`modality` `other`). If habits exist and none were logged in the last 7 days, ask once with the user's habit names. When showing a day, reads the latest exercise logs for that date. Writes `plans` and plan events. Does not log completed sets or extra-plan activity. Does not list background habits as **Sparat pass**.
 
 ### `training-log-and-review`
 
-Logs completed and missed sessions and per-exercise sets (load, reps, optional RPE). Writes append-only `events`. Weekly reviews are not implemented yet. Must not activate major plan changes.
+Logs completed and missed sessions, per-exercise sets (load, reps, optional RPE), and extra-plan activity (`activity_logged`: walks, yoga, climbing, hiking, and similar). Writes append-only `events`. A profile habit is not done until logged. After a week without habit logs, ask once with the user's habit names. Weekly reviews are not implemented yet. Must not activate major plan changes.
 
 ### `training-nutrition` (deferred)
 
-Collects nutrition preferences and constraints. Gives simple meal suggestions tied to training, goals, and recovery. No diagnoses, no medication advice, no clinical diets.
+Collects nutrition preferences and constraints. Gives simple meal suggestions tied to training, goals, recovery, confirmed lifestyle habits, and `activity_logged`. No diagnoses, no medication advice, no clinical diets. Do not store kcal as confirmed facts.
 
 ## Defaults
 

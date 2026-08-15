@@ -1,6 +1,6 @@
 # Loads, PRs, running, and results
 
-Derived from `exercise_logged`. No extra table.
+Derived from `exercise_logged`. No extra table. Do not use `activity_logged` for last working load, PRs, or running PRs.
 
 **Prescribe with RPE until there is a logged load. After that, track kg/reps/time so results are visible.** Do not show PRs unless asked.
 

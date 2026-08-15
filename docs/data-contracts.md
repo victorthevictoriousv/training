@@ -84,8 +84,9 @@ Event types:
 - `exercise_logged`
 - `session_completed`
 - `session_missed`
+- `activity_logged`
 
-Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` for that key. Do not UPDATE earlier rows. Do not store PRs in a separate table.
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` for that key. Current extra-plan activity for a date is the latest `activity_logged` for that `user_id + payload.date + payload.activity_key`. Do not UPDATE earlier rows. Do not store PRs in a separate table. Do not mix `activity_logged` into exercise PR or last-load queries.
 
 ### `recommendations`
 
@@ -126,7 +127,13 @@ Only confirmed fields. Omit keys that are not yet confirmed.
     "days_per_week": 4,
     "session_minutes": 60,
     "preferred_days": ["mon", "wed", "fri", "sun"],
-    "constraints": ""
+    "constraints": "",
+    "two_a_day": "some_days",
+    "windows": [
+      { "slot": "lunch", "modality": "strength", "minutes": 45 },
+      { "slot": "evening", "modality": "running" }
+    ],
+    "anchor": "Styrka på lunchen när dagen har gym"
   },
   "equipment": {
     "location": "gym",
@@ -152,6 +159,34 @@ Only confirmed fields. Omit keys that are not yet confirmed.
     "travel": "",
     "schedule_notes": ""
   },
+  "lifestyle": {
+    "habits": [
+      {
+        "key": "treadmill_walk",
+        "name": "Gåband",
+        "kind": "lifestyle",
+        "plan_inclusion": "background",
+        "typical_duration_min": 30,
+        "typical_speed_kmh": 4.5,
+        "typical_distance_km": null,
+        "times_per_day": 2,
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "notes": "hemma, arbetsdagar"
+      },
+      {
+        "key": "yoga",
+        "name": "Yoga",
+        "kind": "lifestyle",
+        "plan_inclusion": "background",
+        "typical_duration_min": 20,
+        "typical_speed_kmh": null,
+        "typical_distance_km": null,
+        "times_per_day": 1,
+        "days": ["mon", "tue", "wed", "thu", "fri", "sun"],
+        "notes": "lätt rörlighet, även vissa vilodagar"
+      }
+    ]
+  },
   "modalities": ["strength", "running", "mobility", "recovery"]
 }
 ```
@@ -159,12 +194,24 @@ Only confirmed fields. Omit keys that are not yet confirmed.
 Field rules:
 
 - `goals.primary`: `strength | running | mobility | recovery | general`
+- `goals.notes` may include that training is a hobby or they like high volume, in their words. Do not infer elite volume tolerance
 - `experience.*` (except `training_age_years`): `beginner | intermediate | advanced`
 - `equipment.location`: `gym | home | mixed`
 - `preferred_days` and `modalities`: `mon | tue | wed | thu | fri | sat | sun` and `strength | running | mobility | recovery`
+- `availability.days_per_week` is training **days**, not session count
+- `availability.session_minutes` is a fallback length; per-window `minutes` on `windows` win when present
+- `availability.windows` is optional. Possible slots (`morning | lunch | evening`), not a daily mandate. Each: `slot`, optional `modality`, optional `minutes`
+- `availability.two_a_day`: `never | some_days` when confirmed. `some_days` allows two sessions the same day on some days, not every training day. Do not store a weekly gym+run quota
+- `availability.anchor` is optional preference text the planner may drop under poor recovery or time pressure
 - `health.*` stores the user's own words and lists, not diagnoses
 - `medications_mentioned` is a boolean flag only. Do not store drug names in `data`. If the user mentions medication, record an observation event and never give medication advice
 - `modalities` is the set the user wants in weekly plans
+- `lifestyle.habits` is optional. Recurring activity outside the four training modalities. Pattern only: an instance must be `activity_logged` to count as done. Do not store kcal, MET, or TDEE here
+- habit `kind`: `lifestyle` (easy everyday movement or easy mobility/yoga ritual) or `extra` (recreational load such as climbing or hiking)
+- habit `plan_inclusion`: `background` (never a plan session) or `scheduled` (insert a session on `days`)
+- Default `plan_inclusion`: `background` for `kind` `lifestyle`; ask for `extra` when `days` are named (suggest `scheduled`); `background` if no days
+- habit `days`: `mon | tue | wed | thu | fri | sat | sun`
+- habit `key`: lowercase snake_case, stable. Do not add a habit `key` as a `data.modalities` value
 
 ## `user_profiles.provenance`
 
@@ -217,6 +264,7 @@ If `safety_status` is `restricted`, the plan must stay conservative and respect 
         {
           "id": "s1",
           "modality": "strength",
+          "slot": "lunch",
           "title": "Undre kropp",
           "duration_min": 60,
           "rpe_target": 7,
@@ -241,7 +289,11 @@ If `safety_status` is `restricted`, the plan must stay conservative and respect 
 }
 ```
 
-Session `modality`: `strength | running | mobility | recovery`.
+Session `modality`: `strength | running | mobility | recovery | other`.
+
+Optional session `slot`: `morning | lunch | evening`. Set when the window is known. Omit on older plans.
+
+`other` is only for `plan_inclusion = scheduled` habits (climbing, hiking). Do not put `other` in top-level `content.modalities`. Set `habit_key` on those sessions. Background habits are not sessions.
 
 Block items are intentionally loose in v1:
 
@@ -249,6 +301,7 @@ Block items are intentionally loose in v1:
 - Running: `name`, `duration_min` and/or `distance_km`, `intensity`, `notes`
 - Mobility: `name`, `duration_min`, `notes`
 - Recovery: `name`, `duration_min`, `notes`
+- Other (scheduled habit): `name`, `duration_min` and/or `distance_km`, `notes`
 
 ## Event payloads (v1)
 
@@ -304,6 +357,8 @@ Block items are intentionally loose in v1:
 }
 ```
 
+`reps` must be an integer or null. Never store a range (`8–10`) or `reps_text`. If only a range is known, store the low end. Dumbbell `load_kg` is per implement; `load_text` like `30 kg/hantel`.
+
 Running set example: `{ "load_kg": null, "load_text": "32 min", "reps": null, "rpe": 3, "duration_min": 32, "distance_km": null }`.
 
 `session_completed` / `session_missed`
@@ -320,6 +375,35 @@ Running set example: `{ "load_kg": null, "load_text": "32 min", "reps": null, "r
 ```
 
 `status`: `completed | partial | missed`. For running, put duration/distance in `notes` or log a matching `exercise_logged` with `load_kg` null and duration in `load_text`.
+
+`activity_logged`
+
+Lifestyle or recreational activity. Background walks and background yoga are never planned sessions. A profile habit is not done until this event exists. Scheduled habit sessions (climbing on a plan day) set `plan_id` / `session_id` and also get `session_completed`.
+
+```json
+{
+  "date": "2026-08-15",
+  "habit_key": "treadmill_walk",
+  "activity_key": "treadmill_walk",
+  "activity_name": "Gåband",
+  "kind": "lifestyle",
+  "duration_min": 30,
+  "distance_km": null,
+  "speed_kmh": 4.5,
+  "rpe": null,
+  "intensity": "easy",
+  "notes": "",
+  "raw_text": "gick 30 min 4,5 km/h"
+}
+```
+
+- `habit_key`: matching confirmed `lifestyle.habits[].key`, or null for a one-off
+- `kind`: `lifestyle | extra`
+- `intensity`: `easy | moderate | hard`
+- `plan_id` / `session_id`: set when the activity matches a scheduled habit session that day; otherwise null
+- Store what the user said. Do not derive `distance_km` from speed × time as a confirmed value
+- Do not store kcal
+- Latest row for `user_id + date + activity_key` is current. Corrections are new rows
 
 ## Identity in v1
 

@@ -5,7 +5,18 @@ v1 runtime: one ChatGPT Project, the GitHub connector, and the official Supabase
 ## 1. Supabase
 
 1. A dedicated Supabase project named `Training` already exists (`eqgfiaqqsmupbvcvcuce`, West EU / Ireland). Use that project.
-2. `0001_init.sql` and `0002_rls_and_log_events.sql` have been applied. Confirm the four tables still exist:
+2. `0001_init.sql` and `0002_rls_and_log_events.sql` have been applied. Apply [`0003_activity_logged.sql`](../supabase/migrations/0003_activity_logged.sql) in the SQL editor if `activity_logged` is not yet in the `events` type check:
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'events'::regclass
+  and conname = 'events_type_check';
+```
+
+Expected: the definition includes `activity_logged`.
+
+3. Confirm the four tables still exist:
 
 ```sql
 select table_name
@@ -17,7 +28,7 @@ order by table_name;
 
 Expected: four rows.
 
-3. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
+4. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
 
 `USER_ID` is already set to `815c0d8e-9e76-4dbb-9c89-86a504bb5da0`. Keep it unless you intentionally rotate identity.
 
@@ -147,6 +158,41 @@ where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
   and type in ('exercise_logged', 'session_completed', 'session_missed')
 order by created_at;
 ```
+
+### D4. Lifestyle habit and extra-plan activity
+
+After B, in **träning**: `Jag går på gåband hemma 30 min 4,5 km/h två gånger om dagen på arbetsdagar.`
+
+Expected: confirmation card proposing `lifestyle.habits`. Without `godkänn`, `data` is unchanged. After `ja, spara`:
+
+```sql
+select data->'lifestyle'->'habits' as habits,
+       provenance->'lifestyle.habits' as habits_provenance
+from user_profiles
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
+```
+
+Expected: one habit (`treadmill_walk` or similar), `kind` `lifestyle`, `plan_inclusion` `background`, `times_per_day` 2, workdays, `typical_speed_kmh` 4.5. Provenance for `lifestyle.habits`. No kcal in `data`.
+
+Then: `Gick 30 min på gåbandet`.
+
+Expected: **Sparat:** … immediately (no second `godkänn`). No `session_completed`.
+
+```sql
+select type, payload
+from events
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+  and type = 'activity_logged'
+order by created_at;
+```
+
+Expected: `kind` `lifestyle`, `duration_min` 30, `habit_key` matching the habit, `plan_id` null. Speed only if you stated it. No kcal.
+
+Then `Lägg en veckoplan för nästa vecka.` Expected: draft `intent` mentions the gåband habit; `content.days` has no gåband sessions. After `godkänn`, same in the saved plan.
+
+`Vad är dagens pass?` Expected: **Sparat pass** is only programmed sessions, not the walks.
+
+Optional habit with a weekday: `Jag klättrar onsdagar ca 90 min, lägg in det i schemat.` After `godkänn`, a climbing habit with `plan_inclusion` `scheduled`. Next week draft has an `other` session on Wednesday with `habit_key`. `Klättrade 2h` that Wednesday → `activity_logged` plus `session_completed`. An extra climb on another day → `activity_logged` only.
 
 ### E. End-to-end provenance
 
