@@ -34,7 +34,7 @@ Normalize: lowercase, strip diacritics, treat `-` and spaces as nothing (`pull-u
 
 1. Prefer a unique planned item for that date. Match `name`, aliases, **or** `preferred.name` / `preferred.key` when present.
 2. If several items match, ask.
-3. If none match but the name is a clear exercise, log it anyway with a slug from the user text. `session_id` is **null** even if the day has exactly one planned session of another kind (do not attach extra goblet to evening intervals). `plan_id` may still be the active plan. Do not write `session_completed`.
+3. If none match but the name is a clear exercise, log it anyway with a slug from the user text. `session_id` is **null** even if the day has exactly one planned session of another kind (do not attach extra goblet to evening intervals). `plan_id` is the covering plan for that date when one exists. Do not write `session_completed`.
 
 When matched:
 

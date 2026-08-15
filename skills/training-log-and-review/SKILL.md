@@ -47,11 +47,21 @@ Read if not already in context:
 Date = today in `Europe/Stockholm` unless the user named a day.
 
 ```sql
-select id, title, content
+select id, status, period_start, period_end, title, content
 from plans
 where user_id = :USER_ID
-  and status = 'active'
-order by created_at desc
+  and period_start <= :date
+  and period_end >= :date
+  and status in ('active', 'proposed', 'completed', 'superseded')
+order by
+  case status
+    when 'active' then 0
+    when 'proposed' then 1
+    when 'completed' then 2
+    else 3
+  end,
+  activated_at desc nulls last,
+  created_at desc
 limit 1;
 
 select data->'lifestyle'->'habits' as habits
@@ -82,6 +92,8 @@ group by payload->>'habit_key';
 
 Current load per `exercise_key` is the first row for that key in this list (already newest-first). Current extra-plan activity is the latest row per `activity_key` + `instance` (missing `instance` = 1). Sum those current bouts for the day's load. Next new bout: `max(instance) + 1` for that date + key.
 
+Match planned items against that covering row’s `content` for `:date`, not against `status = 'active'` alone. Do not `UPDATE plans` here (no lazy activate).
+
 If the SELECT fails: say you could not read the saved plan or logs. Do not invent a session or loads.
 
 A profile habit is not done until `activity_logged`. If habit catch-up in `activity-load.md` applies and this is not a mid-set gym log, ask once with their habit names, then continue.
@@ -110,7 +122,7 @@ insert into events (
 );
 ```
 
-`plan_id` may be the active plan when one exists. `session_id` is set only when the exercise matches a planned item that day (or is a clear accessory of that same session). If nothing planned matches, `session_id` is null even if the day has exactly one other session (do not attach extra goblet to evening intervals). Still log if the exercise is unambiguous. Do not write `session_completed` for unmatched extra gym.
+`plan_id` is the covering plan for that date when one exists (the row from step 1), even if its status is `proposed`, `completed`, or `superseded`. `session_id` is set only when the exercise matches a planned item that day (or is a clear accessory of that same session). If nothing planned matches, `session_id` is null even if the day has exactly one other session (do not attach extra goblet to evening intervals). Still log if the exercise is unambiguous. Do not write `session_completed` for unmatched extra gym. Do not `UPDATE plans` here (no lazy activate).
 
 ### 3. Extra-plan activity and scheduled habit sessions
 
@@ -153,7 +165,7 @@ insert into events (
 );
 ```
 
-`:plan_id` is the active plan when the activity matches a scheduled session that day; otherwise null. Put `session_id` in the payload in that case.
+`:plan_id` is the covering plan for that date when the activity matches a scheduled session that day; otherwise null. Put `session_id` in the payload in that case.
 
 One user message may contain several activities (`gåband … och yoga …`). Parse each and `INSERT` one `activity_logged` per activity in the same turn.
 

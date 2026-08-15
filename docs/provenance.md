@@ -41,8 +41,10 @@ Inference (do not save as profile fact):
 | --- | --- |
 | First confirmed profile | `safety_screening_completed` then `profile_confirmed` |
 | Later confirmed profile edits | `profile_updated` (and `safety_screening_completed` if screening changed) |
-| New plan after approval | `plan_proposed` then `plan_activated` |
-| Replacing an active plan | `plan_superseded` on the old plan, then proposed + activated on the new |
+| New plan after approval (same week / starts today or earlier) | `plan_proposed` then `plan_activated` |
+| Replacing an active plan (same week) | `plan_superseded` on the old plan, then proposed + activated on the new |
+| Future week after approval (`period_start` after today) | `plan_proposed` only; current `active` week stays. Activate later via lazy activate |
+| Replacing a queued future `proposed` week | `plan_superseded` on that proposed row, then `plan_proposed` on the new (still not `active`) |
 | Exercise log or weight correction | `exercise_logged` (append; latest wins) |
 | Extra-plan activity or a correction of it | `activity_logged` (append; latest per date + `activity_key` + `instance` wins; new bout vs correction per log-schema) |
 | Finished or skipped session | `session_completed` or `session_missed` |

@@ -100,7 +100,7 @@ If they volunteer that the routine gym lacks an exercise, and this is **not** a 
 - Confirmation card: X saknas på rutin-gymmet; hemma-alternativ Y; förstahand X följer med till annat gym.
 - After `godkänn`, write the full `equipment.home_gym_substitutions` array. Keep unrelated pairs. Provenance key is `equipment.home_gym_substitutions`.
 
-If an active plan has that exercise this week, load `training-plan` instead so the session is updated in the same turn.
+If a covering plan for this week has that exercise, load `training-plan` instead so the session is updated in the same turn.
 
 `nu har gymmet X` / remove a pair: drop that object from the array, confirm, then `profile_updated`. If the array would be empty, omit the key from `data` and drop `equipment.home_gym_substitutions` from `provenance`. Do not save `[]`.
 

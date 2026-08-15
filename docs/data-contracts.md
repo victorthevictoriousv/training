@@ -54,7 +54,13 @@ One row per user. `user_id` is unique.
 | `activated_at` | `timestamptz` | Set when status becomes `active` |
 | `archived_at` | `timestamptz` | |
 
-v1 allows more than one `active` row at the database level. Skills must keep exactly one `active` plan per user by superseding the previous one.
+v1 allows more than one `active` row at the database level. Skills must keep **at most one `active`** plan per user, and **at most one `proposed` future week**.
+
+Lookup is by **date**, not by the `active` row alone: the covering plan is the row whose `period_start`–`period_end` contains the date, preferring `active`, then `proposed`, then `completed`, then `superseded`. A still-running week must stay visible after the next week is saved.
+
+- Same-week replacement: supersede the current `active` row, then propose + activate in the same turn.
+- Future week (`period_start` after today): leave the current `active` week in place; insert the new row as `proposed` after approval. Do not activate until that Monday (lazy activate on `training-plan` read: complete the expired week, then activate). A `proposed` row after `godkänn` is the saved next week, not a chat draft.
+- When an ISO week ends naturally, set it `completed` (not `superseded`). `superseded` means replaced mid-week or replaced as a draft of the same future week.
 
 ### `events`
 

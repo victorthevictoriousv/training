@@ -29,7 +29,7 @@ Read `data.equipment.home_gym_substitutions` (may be absent).
 - Known pairs beat a new guess.
 - If the stored home exercise is also missing, ask and propose a new pair.
 
-## Gym-unavailable from an active plan
+## Gym-unavailable from a covering plan
 
 1. Identify the planned item (today or the named day).
 2. Propose **one** substitute using the rules below. Draft as **Förslag (sparas inte än)**.

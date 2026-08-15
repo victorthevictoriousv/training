@@ -1,12 +1,12 @@
 # Minor vs major plan changes
 
-Use this after a plan is `active`. When unsure, treat the change as major.
+Use this after a covering plan exists for the date being changed (`active`, or still-current `proposed` / `superseded` / `completed`). When unsure, treat the change as major.
 
 Do not change the profile for a one-week situation. `availability` / habits updates are onboarding, then a new week.
 
 **Exception:** they **mean** a planned exercise is unavailable at the routine gym (context, not a set phrase). That is gym fact (`equipment.home_gym_substitutions`), not a one-week squeeze. After one `godkänn`, update the plan item **and** the profile. A this-week swap without that meaning is plan-only. See `references/exercise-substitutions.md`.
 
-## Minor (after approval: edit the active plan in place)
+## Minor (after approval: edit the covering plan in place)
 
 Show **Förslag (sparas inte än)**. On explicit approval, `UPDATE plans.content`. If they do not approve, write nothing.
 
@@ -27,7 +27,7 @@ Draft remaining-week changes as one card. Do not ask pass by pass.
 
 ## Major (after approval: new proposed plan)
 
-Then follow the supersede + proposed + activated write in `SKILL.md`.
+Then follow the new-or-replacement week write in `SKILL.md` (same-week: supersede + activate; future week: leave `proposed`).
 
 - Change how many **days** per week they train (new normal, not a one-week extra session on a rest day)
 - Add or remove a modality

@@ -108,7 +108,7 @@ In a fresh database (or before B), ask: `Lägg en veckoplan.`
 
 Expected: onboarding starts; no `plans` row.
 
-### D. Plan — propose then activate
+### D. Plan — propose then save
 
 After B: `Lägg en veckoplan för nästa vecka.`
 
@@ -129,19 +129,19 @@ order by created_at;
 
 Expected:
 
-- exactly one `active` plan
+- at most one `active` plan; at most one `proposed` future week
 - `period_start` is a Monday, `period_end` the following Sunday
 - `content.days` only uses modalities you confirmed
-- events `plan_proposed` and `plan_activated` for that `plan_id`
-- `activated_at` is set
+- If that Monday is **after today**: the new row is `proposed`, event `plan_proposed` only, `activated_at` is null. No `plan_activated`. An existing current week (if any) stays `active`.
+- If that Monday is **today or earlier**: events `plan_proposed` and `plan_activated` for that `plan_id`, `activated_at` is set, status `active`
 
 ### D2. Show today's saved session
 
 New chat: `Vad är dagens pass?`
 
-Expected: it runs SELECT, then shows only the sessions stored for today's date in the active plan, labelled **Sparat pass**. If the tool fails it says so and does not invent a workout.
+Expected: it runs the covering-plan SELECT for **today** (not `status = 'active'` alone), then shows only the sessions stored for today's date in that plan, labelled **Sparat pass**. If today is not in any saved week, it says there is no saved plan for that date (not a rest day, not an invented workout). If the tool fails it says so and does not invent a workout.
 
-Then ask to **byt** one exercise (do not say it is missing at the gym). Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in `plans.content` matches the new session and `data.equipment.home_gym_substitutions` is unchanged. Without `godkänn`, `content` is unchanged.
+Then ask to **byt** one exercise (do not say it is missing at the gym). Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in the covering plan’s `content` matches the new session and `data.equipment.home_gym_substitutions` is unchanged. Without `godkänn`, `content` is unchanged.
 
 ### D3. Log a set and the session
 
@@ -206,7 +206,7 @@ Optional habit with a weekday: `Jag klättrar onsdagar ca 90 min, lägg in det i
 
 ### D5. Gym-unavailable vs this-week swap
 
-After D (an `active` week exists). Pick a named strength exercise from that week. The prompts below are examples; the skill should also accept other wordings with the same meaning.
+After D (a covering plan exists for the days you will edit). Pick a named strength exercise from that week. The prompts below are examples; the skill should also accept other wordings with the same meaning.
 
 First, this-week swap only: `Byt [övning] mot något annat.` Do not imply the gym lacks it.
 
@@ -220,7 +220,16 @@ Expected: **Förslag (sparas inte än)** with one home alternative and the origi
 select content
 from plans
 where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
-  and status = 'active';
+  and period_start <= (now() at time zone 'Europe/Stockholm')::date
+  and period_end >= (now() at time zone 'Europe/Stockholm')::date
+order by
+  case status
+    when 'active' then 0
+    when 'proposed' then 1
+    when 'completed' then 2
+    else 3
+  end
+limit 1;
 
 select data->'equipment'->'home_gym_substitutions' as substitutions,
        provenance->'equipment.home_gym_substitutions' as substitutions_provenance
@@ -241,6 +250,14 @@ Expected:
 Next week draft should reuse the stored pair without asking again.
 
 `Nu har gymmet [originalövning].` After `godkänn`: that pair is gone from `home_gym_substitutions` (omit the key if the array is empty).
+
+### D6. Next week must not hide the rest of this week
+
+After a current-week plan is `active` (period still contains today), `Lägg en veckoplan för nästa vecka.` then `godkänn`.
+
+Expected: current week still `active`; next week is `proposed` (not `active`). `plan_superseded` must not fire on the current week.
+
+Then ask about a remaining day of the current week (e.g. `har jag något löppass imorgon?` when tomorrow is still in this ISO week). Expected: **Sparat pass** from the current week’s `content`, not “ingen plan” / rest just because next week is saved.
 
 ### E. End-to-end provenance
 

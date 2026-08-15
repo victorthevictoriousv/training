@@ -31,25 +31,32 @@ After any write, say what was saved, in Swedish.
 ## Plans
 
 - Draft a new week in the conversation first.
-- On approval of a new week:
+- On approval of a **same-week** replacement (`period_start` ≤ today, or the same ISO week as the current `active` plan):
   1. If another plan is `active`, set it to `superseded`, set `archived_at`, insert `plan_superseded`.
   2. Insert the new row as `proposed` and insert `plan_proposed`.
   3. Update that row to `active`, set `activated_at`, insert `plan_activated`.
-- Do not leave a `proposed` plan sitting in the database without a following activation in the same turn unless the user asked to save a draft and wait. v1 default is propose-in-chat, then write proposed+active after approval.
+- On approval of a **future** week (`period_start` > today):
+  1. Do not supersede an `active` plan whose `period_end` is still today or later.
+  2. If a `proposed` row already exists for that same `period_start`, supersede **that** row, then insert the new one.
+  3. Insert the new row as `proposed` and insert `plan_proposed`. Do not activate in the same turn. A `proposed` row after `godkänn` is the saved next week, not a chat draft.
+- Lazy activate on plan read in `training-plan`: if a `proposed` plan’s period contains today, set the expired `active` week (`period_end` < today) to `completed` and activate the new row. No cron.
+- Keep at most one `active` plan. At most one `proposed` future week. Chat drafts stay in the conversation until approval.
 
 ## Presenting a saved session
 
-- Always `SELECT` the `active` plan before showing today's (or any day's) session.
-- Show only what is stored in `plans.content` for that date. Label it **Sparat pass**. Background habits and unplanned `activity_logged` are not sessions. Scheduled habit sessions that exist in `content` are **Sparat pass**.
+- Always `SELECT` the **covering plan for that date** (`period_start` ≤ date ≤ `period_end`, prefer `active` then `proposed` then `completed` then `superseded`). Do not use `status = 'active'` alone.
+- Show only what is stored in that plan’s `plans.content` for that date. Label it **Sparat pass**. Background habits and unplanned `activity_logged` are not sessions. Scheduled habit sessions that exist in `content` are **Sparat pass**.
 - If a strength item has `preferred`, show the prescribed `name` as the work, then **Förstahand (annat gym):** and `preferred.name`. Cue last working load for `name` by default.
 - If the read fails: say so. Never generate a stand-in workout.
-- If that date has no sessions: it is a rest day in the saved plan. Do not fill it in unless the user asks to add something, and then wait for approval before writing.
+- If no covering plan exists for that date: there is no saved plan for that date. Do not call it a rest day.
+- If that date exists in `content.days` and has no sessions: it is a rest day in the saved plan. Do not fill it in unless the user asks to add something, and then wait for approval before writing.
+- “This week” is the covering plan for **today**. A queued `proposed` next week must not hide remaining days of the current week.
 
 ## Changing a saved session
 
 - The user may change a day or ask to reshape remaining days. Draft as **Förslag (sparas inte än)** with a short before/after. Remaining-week changes are one draft, not pass-by-pass questions.
 - Nothing is written until explicit approval.
-- After approval of a minor change, `UPDATE` `plans.content` so the saved plan matches the draft. Then say that the plan was updated.
+- After approval of a minor change, `UPDATE` the covering plan’s `content` so the saved plan matches the draft (the row that covers that date, even if it is not `active`). Then say that the plan was updated.
 - Do not leave a changed workout only in the conversation.
 - Do not change `user_profiles` for a one-week situation. A new normal (“så här tränar jag nu”) is onboarding, then a new week.
 - **Exception — gym missing an exercise:** if they **mean** a planned exercise is unavailable at the routine gym (context, not a set phrase), that is confirmed gym fact, not a one-week squeeze. After approval of one card, `UPDATE` the plan item (`name` / `key` = home alternative, `preferred` = first choice) **and** merge the pair into `data.equipment.home_gym_substitutions` with `profile_updated`. If they only want another exercise, treat it as a this-week swap: plan only, no `preferred`, no profile write.
@@ -91,9 +98,9 @@ Read context. Do not require exact wording. Examples below are illustrations, no
 
 ## Minor vs major changes
 
-Applies once a plan is `active`. Both still wait for approval before any write.
+Applies once a covering plan exists for the date. Both still wait for approval before any write.
 
-Minor (after approval: `UPDATE` the active plan's `content` in place):
+Minor (after approval: `UPDATE` the covering plan's `content` in place):
 
 - Change the exercises, sets, or structure of an already scheduled day
 - Swap an exercise for a close equivalent (this week only, unless they said it is missing at the gym)
