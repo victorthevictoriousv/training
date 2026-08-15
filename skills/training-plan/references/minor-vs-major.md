@@ -2,10 +2,11 @@
 
 Use this after a plan is `active`. When unsure, treat the change as major.
 
-## Minor (edit the active plan in place)
+## Minor (after approval: edit the active plan in place)
 
-Tell the user what changed, then `UPDATE plans.content`.
+Show **Förslag (sparas inte än)**. On explicit approval, `UPDATE plans.content`. If they do not approve, write nothing.
 
+- Change the exercises or structure of an already scheduled day
 - Swap an exercise for a close equivalent (same pattern and difficulty)
 - Add or remove about one set
 - Move a session to another day in the same week
@@ -13,7 +14,7 @@ Tell the user what changed, then `UPDATE plans.content`.
 
 Minor changes stay inside the already approved days-per-week, modalities, and overall intensity.
 
-## Major (new proposed plan, wait for approval)
+## Major (after approval: new proposed plan)
 
 Then follow the supersede + proposed + activated write in `SKILL.md`.
 

@@ -124,6 +124,14 @@ Expected:
 - events `plan_proposed` and `plan_activated` for that `plan_id`
 - `activated_at` is set
 
+### D2. Show today's saved session
+
+New chat: `Vad är dagens pass?`
+
+Expected: it runs SELECT, then shows only the sessions stored for today's date in the active plan, labelled **Sparat pass**. If the tool fails it says so and does not invent a workout.
+
+Then ask to change one exercise. Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in `plans.content` matches the new session. Without `godkänn`, `content` is unchanged.
+
 ### E. End-to-end provenance
 
 ```sql

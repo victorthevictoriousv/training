@@ -42,8 +42,8 @@ Follow these documents from `GITHUB_REPO`. If a skill restates them, the documen
 
 Load the matching skill from `GITHUB_REPO` and follow it. Prefer `@training-onboarding` / `@training-plan` when the user can mention them; otherwise open the `SKILL.md` file.
 
-- New user, missing profile, safety screening, "uppdatera min profil", injuries, time, equipment, goals → `skills/training-onboarding/SKILL.md`
-- Create or change a weekly plan, "lägg en vecka", adapt this week → `skills/training-plan/SKILL.md`
+- New user, missing profile, safety screening, profile updates, injuries, time, equipment, goals → `skills/training-onboarding/SKILL.md`
+- Anything about seeing, doing, or changing planned training (today, tomorrow, this week, a named day, or similar) → `skills/training-plan/SKILL.md`
 - If a plan is requested but the minimum profile is missing, run onboarding first, then plan.
 - Logging completed sessions, weekly reviews, and meal plans are not implemented. Say so in Swedish. You may collect nutrition preferences into the profile via onboarding. Do not invent meal plans or session logs in the database.
 
@@ -55,3 +55,15 @@ Load the matching skill from `GITHUB_REPO` and follow it. Prefer `@training-onbo
 - After writing, tell the user what was saved.
 - Combine strength, running, mobility, and recovery in a week only when the user selected those modalities.
 - Defaults: locale `sv-SE`, timezone `Europe/Stockholm`, ISO week Monday–Sunday.
+
+## Saved sessions (hard rule)
+
+Before presenting any workout or session (today, tomorrow, a named day, "what should I train", or any similar request):
+
+1. `SELECT` the `active` plan for `USER_ID` via the Supabase app.
+2. Present only sessions that exist on that date in `plans.content`.
+3. Label them **Sparat pass**.
+
+If the SELECT fails, times out, or returns no active plan: say that in Swedish. Do not invent a substitute workout. Do not present a newly generated session as if it were the saved plan.
+
+The user may ask to change a saved session. Draft the change as **Förslag (sparas inte än)**. Write to `plans` only after explicit approval (`ja`, `godkänn`, `spara`). After a write, the saved plan must match what you just confirmed.

@@ -1,6 +1,6 @@
 ---
 name: training-plan
-description: Create or change a weekly training plan combining strength, running, mobility, and recovery. Use when the user wants a week plan, wants to adapt this week, or asks to replace the current plan. Do not use for profile collection, session logging, weekly reviews, or meal plans.
+description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see, do, or change planned training — including today's session, tomorrow, a named day, the weekly plan, or similar phrasing. Match intent, not exact wording. Do not use for profile collection, session logging, weekly reviews, or meal plans.
 ---
 
 # training-plan
@@ -78,9 +78,40 @@ Programming rules (v1, not a periodization engine):
 
 Show the week in Swedish as **Förslag (sparas inte än)**. Label inferences separately. Wait for `godkänn` / `ja` / `spara`.
 
-If they request a major change to an already active plan, draft a replacement week and wait. If they request a minor tweak, you may apply it after saying what changes; see `references/minor-vs-major.md`.
+If they request a change to an already active plan, follow "Present or change a saved session" or the major-replacement write. Never treat a newly generated session as the saved plan.
 
-### 4. Write after approval (new or replacement week)
+### 4. Present or change a saved session
+
+Use this whenever the user wants to see or change planned training for today, tomorrow, a named date, or the current week. Match intent, not exact wording.
+
+**Read first. Always.** Run the `SELECT` in step 1 in this turn. Do not use an earlier chat message as the source of the workout.
+
+- If the Supabase tool fails or returns an error: say in Swedish that you could not read the saved plan. Stop. Do not invent a session.
+- If there is no `active` plan: say so and offer to create a week (step 2–3). Do not invent a session.
+- Resolve the date in `Europe/Stockholm` (today unless the user named a date). Find that date in `content.days`.
+- If `sessions` is empty: tell them the saved plan has rest that day.
+- Otherwise present those sessions in Swedish as **Sparat pass**. Mention the plan title and date. Do not add exercises that are not in `content`.
+
+If they want to change that day:
+
+1. Draft the new session(s) as **Förslag (sparas inte än)** with a short before/after.
+2. Wait for explicit approval (`ja`, `godkänn`, `spara`).
+3. Classify using `references/minor-vs-major.md`.
+4. Minor: `UPDATE` the active row's `content` so that day's `sessions` match the approved draft. Keep the rest of the week unchanged. Then confirm that the saved plan was updated.
+5. Major: do not UPDATE in place. Follow step 5 (new week) after approval.
+6. If they do not approve: leave the database unchanged.
+
+Example update after approval (replace `:content` with the full updated JSON, not a fragment):
+
+```sql
+update plans
+set content = :content::jsonb
+where id = :plan_id
+  and user_id = :USER_ID
+  and status = 'active';
+```
+
+### 5. Write after approval (new or replacement week)
 
 Keep exactly one `active` plan.
 
@@ -144,22 +175,10 @@ values (
 `version` is `1` for the first plan, otherwise previous `version + 1`.
 `payload` follows `docs/data-contracts.md`.
 
-### 5. Minor tweak to the active plan
-
-If the change is minor and a plan is already `active`:
-
-- `UPDATE plans.content` (and title/intent if needed) on that row
-- Tell the user what changed
-- Do not insert a new plan
-- Do not insert `plan_proposed` / `plan_activated`
-- Optional: skip extra events in v1 for minor tweaks (no matching event type). Mention the change in the Swedish reply only.
-
-If unsure whether it is minor, treat it as major (replacement plan).
-
 ### 6. After the write
 
 Confirm in Swedish: week dates, number of sessions, modalities, and that it is saved as `active`.
 
 ## Dialogue
 
-Swedish. Show a compact week table (day, modality, title, minutes, RPE). Do not dump raw JSON to the user unless they ask.
+Swedish. Label **Sparat pass** vs **Förslag (sparas inte än)** clearly. Show a compact week or day (modality, title, minutes, RPE, exercises). Do not dump raw JSON unless they ask.
