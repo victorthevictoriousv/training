@@ -33,11 +33,11 @@ Fallback if GitHub is unavailable: upload `docs/` and `skills/` into the Project
 
 ## 3. ChatGPT Project
 
-1. Create a Project named `training`.
-2. Paste the contents of [`chatgpt-project-instructions.md`](chatgpt-project-instructions.md) into Project instructions. `USER_ID` and `SUPABASE_PROJECT_REF` are already filled.
-3. Enable the official Supabase app for the project and point it at the training project ref.
-4. Enable GitHub for the project.
-5. Start a new chat inside the project.
+1. Create a Project named **träning** (the Swedish UI name). The GitHub repo and product stay `training`.
+2. Paste everything below the line in [`chatgpt-project-instructions.md`](chatgpt-project-instructions.md) into Project instructions. There are no placeholders to replace: GitHub URL, Supabase ref, and `USER_ID` are already filled.
+3. Enable the official Supabase app for the project and point it at `eqgfiaqqsmupbvcvcuce`.
+4. Enable the GitHub app and allow `https://github.com/victorthevictoriousv/training`.
+5. Start a new chat inside **träning**.
 
 ## 4. Verification
 

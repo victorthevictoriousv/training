@@ -34,7 +34,7 @@ supabase/migrations/   Versioned Postgres schema
 | --- | --- |
 | [docs/product.md](docs/product.md) | Vision, v1 boundary, deferred work |
 | [docs/chatgpt-setup.md](docs/chatgpt-setup.md) | Connect ChatGPT, GitHub, and Supabase; verify the vertical |
-| [docs/chatgpt-project-instructions.md](docs/chatgpt-project-instructions.md) | Paste into the ChatGPT Project |
+| [docs/chatgpt-project-instructions.md](docs/chatgpt-project-instructions.md) | Paste into the ChatGPT Project named **träning** |
 | [docs/data-contracts.md](docs/data-contracts.md) | Tables, JSON payloads, provenance |
 | [skills/training-onboarding/](skills/training-onboarding/) | Collect and confirm the profile |
 | [skills/training-plan/](skills/training-plan/) | Create and activate a weekly plan |
