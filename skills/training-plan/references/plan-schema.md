@@ -60,11 +60,30 @@
 
 ## Item shapes
 
-Strength item: `name`, `sets`, `reps`, `load`, `notes`  
+Strength item: `name`, `sets`, `reps`, `load`, `notes`. Optional `key`. Optional `preferred` (`name`, `key`) when the home-gym exercise differs from the first-choice exercise.  
 Running item: `name`, `duration_min` and/or `distance_km`, `intensity`, `notes`  
 Mobility item: `name`, `duration_min`, `notes`  
 Recovery item: `name`, `duration_min`, `notes` (`duration_min` may be `0` for a rest day note)  
 Other (scheduled habit): `name`, `duration_min` and/or `distance_km`, `notes`
+
+`name` / `key` is what they do at the routine gym. Omit `preferred` when it would duplicate `name`. Set `key` when `preferred` is present.
+
+Substituted strength item:
+
+```json
+{
+  "name": "Sidogång med band",
+  "key": "banded_lateral_walk",
+  "sets": 3,
+  "reps": "12-15",
+  "load": "RPE 7",
+  "notes": "",
+  "preferred": {
+    "name": "Höftabduktion maskin",
+    "key": "hip_abductor_machine"
+  }
+}
+```
 
 Scheduled habit session:
 

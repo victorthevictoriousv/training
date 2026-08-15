@@ -1,6 +1,6 @@
 ---
 name: training-plan
-description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, or reshaping the rest of the week. Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), profile collection, weekly reviews, or meal plans.
+description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, reshaping the rest of the week, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, or meal plans.
 ---
 
 # training-plan
@@ -9,7 +9,7 @@ Create one ISO week of training from the confirmed profile. Draft in chat. Write
 
 ## Do not
 
-- Collect a new profile (load `training-onboarding` instead)
+- Collect a new profile (load `training-onboarding` instead). Exception: a gym-unavailable substitution from an active plan is written here together with the plan update (`equipment.home_gym_substitutions`)
 - Log completed sets or extra-plan activity (load `training-log-and-review` instead)
 - Write meal plans or `recommendations`
 - Activate a plan when `safety_status` is `stop` or `unknown`
@@ -27,6 +27,7 @@ Read if not already in context:
 - `docs/data-contracts.md`
 - `references/plan-schema.md`
 - `references/minor-vs-major.md`
+- `references/exercise-substitutions.md`
 - `references/activity-load.md`
 - `references/volume-and-slots.md`
 - `skills/training-log-and-review/references/loads-and-prs.md`
@@ -99,7 +100,7 @@ Programming rules (v1, not a periodization engine). Follow `references/volume-an
 - You lay out the week from confirmed capacity. Do not ask the user to pick a gym+run quota. Do not hard-code two sessions every training day
 - If `availability.two_a_day` is `some_days`, two sessions the same day are a **tool** on some days (work + easy). Other days stay one session. Never hard + hard the same day
 - If `windows` exist, use those slots when placing sessions. Set session `slot` when known
-- Use `equipment.location` and `items`
+- Use `equipment.location`, `items`, and `home_gym_substitutions`. If a first-choice matches a stored pair, prescribe the home exercise as `name` / `key` and set `preferred` to the first choice (`references/exercise-substitutions.md`). Do not ask again
 - Scale volume/complexity to `experience.*`. If experience is missing and `training_age_years` ≥ 5, program intermediate volume (inference, not a profile write). Do not use a beginner template
 - Recovery is a hard gate: most sessions easy; at most one hard quality run per week; at least one day with no gym and no run if `recovery` is selected or days per week ≥ 4. If a background walk or yoga habit exists, do not add extra walk/mobility sessions; that day may still be empty of gym/run
 - If only one modality was selected, the whole week may be that modality plus rest days
@@ -112,7 +113,7 @@ Programming rules (v1, not a periodization engine). Follow `references/volume-an
 - Unplanned `activity_logged` of `kind` extra in the lookback window: same load caution, still not a new session unless they ask to schedule it.
 - Do not store kcal in the plan. If two sessions land the same day, one fueling line as inference is allowed; do not save it.
 
-Show the week in Swedish as **Förslag (sparas inte än)**. Label inferences separately. If habit catch-up applies (`activity-load.md`), ask with their habit names in the same turn as the draft — do not assume the vanor were done. Wait for `godkänn` / `ja` / `spara` on the week. Habit instances they report go to `training-log-and-review` without a second `godkänn`.
+Show the week in Swedish as **Förslag (sparas inte än)**. When an item has `preferred`, show **Förstahand (annat gym)** on that line. Label inferences separately. If habit catch-up applies (`activity-load.md`), ask with their habit names in the same turn as the draft — do not assume the vanor were done. Wait for `godkänn` / `ja` / `spara` on the week. Habit instances they report go to `training-log-and-review` without a second `godkänn`.
 
 If they request a change to an already active plan, follow "Present or change a saved session" or the major-replacement write. Never treat a newly generated session as the saved plan.
 
@@ -147,23 +148,27 @@ Keep the latest row per `payload.exercise_key` for today, and use the second que
 - Resolve the date in `Europe/Stockholm` (today unless the user named a date). Find that date in `content.days`.
 - If `sessions` is empty: tell them the saved plan has rest that day.
 - Otherwise present those sessions in Swedish as **Sparat pass**. Mention the plan title and date. Do not add exercises that are not in `content`.
-- If already logged today: show **Loggat** (kg × reps).
-- If not yet logged and last working kg exists: show **lägg på X kg**.
+- If an item has `preferred`, show the prescribed `name` as the work, then **Förstahand (annat gym):** and `preferred.name`.
+- If already logged today: show **Loggat** (kg × reps) for that `exercise_key`.
+- If not yet logged and last working kg exists: show **lägg på X kg** for the prescribed `name` (home) by default. If they are clearly doing the first-choice, cue that key instead.
 - If not yet logged and no history: RPE only; do not invent kg.
 - Do not show PR unless asked. For “hur går det” / results, use `training-log-and-review`.
 - If they ask for a PR, load `training-log-and-review` and `loads-and-prs.md`.
 - If they are reporting what they lifted, walked, climbed, or hiked, switch to `skills/training-log-and-review/SKILL.md`. Do not treat a log line as a plan rewrite.
 - Do not list background habits or unplanned `activity_logged` as **Sparat pass**. Scheduled habit sessions that are in `content` are **Sparat pass**.
 
-If they want to change that day, or reshape remaining days after a skip, time pressure, or poor recovery:
+If they want to change an exercise, a day, or reshape remaining days after a skip, time pressure, or poor recovery:
 
-1. Draft as **Förslag (sparas inte än)** with a short before/after. If they asked to reshape the rest of the week, draft **remaining days in one card**, not pass-by-pass questions.
-2. Wait for explicit approval (`ja`, `godkänn`, `spara`).
-3. Classify using `references/minor-vs-major.md`.
-4. Minor, one day: `UPDATE` the active row's `content` so that day's `sessions` match the approved draft. Keep the rest of the week unchanged unless the draft also changed later days.
-5. Minor, remaining week: `UPDATE` `content` so all drafted days match. Do not change the profile.
-6. Major: do not UPDATE in place. Follow step 5 (new week) after approval.
-7. If they do not approve: leave the database unchanged.
+1. Classify exercise-change intent with `references/exercise-substitutions.md` (gym-unavailable vs this-week swap). Use the meaning of the message, not a phrase list. Ask once only if unclear.
+2. Draft as **Förslag (sparas inte än)** with a short before/after. Gym-unavailable: one substitute, keep the original as first choice on the card. If they asked to reshape the rest of the week, draft **remaining days in one card**, not pass-by-pass questions.
+3. Wait for explicit approval (`ja`, `godkänn`, `spara`).
+4. Classify using `references/minor-vs-major.md`.
+5. Minor, one day: `UPDATE` the active row's `content` so that day's `sessions` match the approved draft. Keep the rest of the week unchanged unless the draft also changed later days.
+6. Minor, gym-unavailable: same plan `UPDATE`, **and** merge the pair into `data.equipment.home_gym_substitutions` (full array, keep unrelated pairs), insert `profile_updated`, set provenance `equipment.home_gym_substitutions`. Tell them both were saved.
+7. Minor, remaining week: `UPDATE` `content` so all drafted days match. Do not change the profile unless the same turn also confirmed gym-unavailable pairs.
+8. This-week swap: `UPDATE` `content` only. Do not set `preferred`. Do not write the profile.
+9. Major: do not UPDATE in place. Follow step 5 (new week) after approval.
+10. If they do not approve: leave the database unchanged.
 
 Skipping today's session without asking to move or reshape it is `training-log-and-review` (`session_missed`). Do not auto-raise another session to hard.
 
@@ -176,6 +181,47 @@ where id = :plan_id
   and user_id = :USER_ID
   and status = 'active';
 ```
+
+Gym-unavailable also needs a profile write in the same turn after `godkänn`. Insert `profile_updated` first, then merge the **full** `home_gym_substitutions` array (keep unrelated pairs):
+
+```sql
+insert into events (id, user_id, type, source, source_status, payload)
+values (
+  gen_random_uuid(),
+  :USER_ID,
+  'profile_updated',
+  'user',
+  'confirmed',
+  jsonb_build_object(
+    'fields', jsonb_build_array('equipment.home_gym_substitutions'),
+    'summary', :summary
+  )
+)
+returning id;
+
+-- Use that returned id as :event_id below.
+
+update user_profiles
+set
+  data = jsonb_set(
+    data,
+    '{equipment,home_gym_substitutions}',
+    :substitutions::jsonb
+  ),
+  provenance = jsonb_set(
+    provenance,
+    '{equipment.home_gym_substitutions}',
+    jsonb_build_object(
+      'source', 'user',
+      'status', 'confirmed',
+      'confirmed_at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'event_id', :event_id
+    )
+  )
+where user_id = :USER_ID;
+```
+
+If `data.equipment` is missing `home_gym_substitutions`, `jsonb_set` still creates that key. Do not drop other `equipment` fields. Do not run this for a this-week swap.
 
 ### 5. Write after approval (new or replacement week)
 
@@ -247,4 +293,4 @@ Confirm in Swedish: week dates, number of sessions, modalities, and that it is s
 
 ## Dialogue
 
-Swedish. Label **Sparat pass** vs **Förslag (sparas inte än)** clearly. Show a compact week or day (slot if set, modality, title, minutes, RPE, exercises). Do not dump raw JSON unless they ask. Do not make them design the week.
+Swedish. Label **Sparat pass** vs **Förslag (sparas inte än)** clearly. Show a compact week or day (slot if set, modality, title, minutes, RPE, exercises). When `preferred` exists, show **Förstahand (annat gym)** on that line. Do not dump raw JSON unless they ask. Do not make them design the week.

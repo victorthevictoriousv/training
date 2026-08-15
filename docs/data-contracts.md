@@ -137,7 +137,15 @@ Only confirmed fields. Omit keys that are not yet confirmed.
   },
   "equipment": {
     "location": "gym",
-    "items": ["barbell", "dumbbells", "rack", "bench"]
+    "items": ["barbell", "dumbbells", "rack", "bench"],
+    "home_gym_substitutions": [
+      {
+        "preferred_key": "hip_abductor_machine",
+        "preferred_name": "Höftabduktion maskin",
+        "home_key": "banded_lateral_walk",
+        "home_name": "Sidogång med band"
+      }
+    ]
   },
   "health": {
     "injuries": [],
@@ -197,6 +205,7 @@ Field rules:
 - `goals.notes` may include that training is a hobby or they like high volume, in their words. Do not infer elite volume tolerance
 - `experience.*` (except `training_age_years`): `beginner | intermediate | advanced`
 - `equipment.location`: `gym | home | mixed`
+- `equipment.home_gym_substitutions` is optional. Confirmed pairs for the routine gym only: first-choice exercise (`preferred_key`, `preferred_name`) that is missing there, and the home-gym alternative (`home_key`, `home_name`). One routine gym in v1. Not an AI guess. Provenance key is `equipment.home_gym_substitutions` for the whole array, same pattern as `lifestyle.habits`. Keys are lowercase snake_case. Omit the array until at least one pair is confirmed. Do not store a second named gym
 - `preferred_days` and `modalities`: `mon | tue | wed | thu | fri | sat | sun` and `strength | running | mobility | recovery`
 - `availability.days_per_week` is training **days**, not session count
 - `availability.session_minutes` is a fallback length; per-window `minutes` on `windows` win when present
@@ -297,11 +306,13 @@ Optional session `slot`: `morning | lunch | evening`. Set when the window is kno
 
 Block items are intentionally loose in v1:
 
-- Strength: `name`, `sets`, `reps`, `load`, `notes`
+- Strength: `name`, `sets`, `reps`, `load`, `notes`. Optional `key`. Optional `preferred` (`name`, `key`) when the prescribed home-gym exercise differs from the first-choice exercise
 - Running: `name`, `duration_min` and/or `distance_km`, `intensity`, `notes`
 - Mobility: `name`, `duration_min`, `notes`
 - Recovery: `name`, `duration_min`, `notes`
 - Other (scheduled habit): `name`, `duration_min` and/or `distance_km`, `notes`
+
+`name` / `key` is what they do at the routine gym. `preferred` is omitted when it is the same as `name`. Set `key` when a substitution exists so logs can tell home vs first-choice apart. A this-week swap (they want another exercise, not that the gym lacks it) does not add `preferred` and does not write `home_gym_substitutions`.
 
 ## Event payloads (v1)
 
@@ -358,6 +369,8 @@ Block items are intentionally loose in v1:
 ```
 
 `reps` must be an integer or null. Never store a range (`8–10`) or `reps_text`. If only a range is known, store the low end. Dumbbell `load_kg` is per implement; `load_text` like `30 kg/hantel`.
+
+A shortcut session log may copy last working `load_kg` / reps into a new `exercise_logged` after one user `godkänn`. Until then it is not a confirmed fact. Do not copy planned RPE text into `load_kg`. Optional `notes`: `enligt senaste`. `raw_text` may be the user’s phrase (`logga gympasset`).
 
 Running set example: `{ "load_kg": null, "load_text": "32 min", "reps": null, "rpe": 3, "duration_min": 32, "distance_km": null }`.
 

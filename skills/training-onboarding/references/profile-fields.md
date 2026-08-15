@@ -48,6 +48,13 @@ Do not store a fixed weekly quota of strength sessions + run sessions. That is t
 
 - `location`: `gym | home | mixed`
 - `items`: string array (e.g. `barbell`, `dumbbells`, `bands`, `none`)
+- `home_gym_substitutions` (optional): array of confirmed pairs for the **routine gym**. Each object:
+  - `preferred_key`, `preferred_name`: first-choice exercise that is missing there
+  - `home_key`, `home_name`: what to do at the routine gym instead
+  - Keys are lowercase snake_case, stable
+  - One routine gym in v1. “Another gym” is the `preferred` field on a plan item, not a second profile gym
+
+Do not ask a form of missing machines during onboarding. Capture organically when they mean an exercise is unavailable at the routine gym, or via later add/remove. Provenance key: `equipment.home_gym_substitutions` for the whole array. Write the full confirmed array on each update (add, change, or remove pairs they approved). Keep unrelated pairs. Omit the key until at least one pair is confirmed. Do not invent a pair from a this-week swap.
 
 ### `health`
 

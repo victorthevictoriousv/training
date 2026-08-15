@@ -32,13 +32,20 @@ If two parses are possible, ask.
 
 Normalize: lowercase, strip diacritics, treat `-` and spaces as nothing (`pull-up` = `pullup` = `pullups`).
 
-1. Prefer a unique planned item for that date (name or alias).
+1. Prefer a unique planned item for that date. Match `name`, aliases, **or** `preferred.name` / `preferred.key` when present.
 2. If several items match, ask.
 3. If none match but the name is a clear exercise, log it anyway with a slug from the user text (`session_id` null unless only one session that day).
 
+When matched:
+
+- Log against the prescribed `name` (routine gym) → `exercise_key` = item `key` if set, else slug from `name`. `exercise_name` = `name`.
+- Log against the first-choice (`preferred.name` or an alias of it) → `exercise_key` = `preferred.key`. `exercise_name` = `preferred.name`. Separate history from the home exercise, on purpose.
+
+Cue last working load for the key you are about to log. Default cue when showing the session is the prescribed (home) key.
+
 ## Aliases → typical keys
 
-Use the planned `name` as `exercise_name` when matched. Keys are hints:
+Use the planned `name` as `exercise_name` when matched to the prescribed line. Use `preferred.name` when they logged the first-choice. Keys are hints:
 
 - `bänk`, `bänkpress`, `hantelbänk`, `db bench` → dumbbell bench / bench press item
 - `knäböj`, `goblet`, `squat` → squat item
@@ -79,6 +86,20 @@ Do not treat `jogg` / planned running as extra-plan activity. Planned easy-run i
 
 If it is unclear whether a long walk is the planned run or extra-plan walking, ask once.
 
+## Whole session shortcut
+
+Match intent. Do not require these exact strings. This is not a single-exercise line and not `resten enligt plan`.
+
+| Input | Meaning |
+| --- | --- |
+| `logga mitt gympass` / `logga gympasset` | fill remaining **strength** work from last working; card + one `godkänn` |
+| `logga passet` | same for today's main session (strength on a gym day, run on a run-only day) |
+| `jag körde hela passet` / `klarade alla övningar` / `allt som senast` | same as above |
+
+Not this path: `bänk 80x5` (immediate log), `hoppade över`, `resten enligt plan` (mark done **without** weights).
+
+Fill rules: last working kg/`load_text` (not PR, not plan RPE, no auto-bump); today's planned sets; last per-set reps if set count matches, else planned low end. Ask all missing weights in one message before the card. Default home `name`/`key`; mention `preferred` on the card. Skip warmup. Skip already-logged items.
+
 ## Echo
 
 After a successful insert, one line:
@@ -106,5 +127,9 @@ After a second bout the same day:
 After a scheduled habit session:
 
 `Sparat: Klättring 120 min (pass klart).`
+
+After a shortcut session fill (one line or a short list):
+
+`Sparat: Hantelpress 4×8 @ 30 kg/hantel (enligt senaste). Pass klart.`
 
 Do not add a PR line unless they asked. Do not mention kcal.

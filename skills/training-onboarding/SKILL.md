@@ -1,6 +1,6 @@
 ---
 name: training-onboarding
-description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, or they ask to update the profile. Do not use to create weekly plans, log sessions or extra-plan activity instances, or give meal plans.
+description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, or give meal plans.
 ---
 
 # training-onboarding
@@ -10,6 +10,7 @@ Collect profile data, run a safety screen, and write confirmed facts only after 
 ## Do not
 
 - Create or activate weekly plans (hand off to `training-plan`)
+- Swap or substitute a **planned** exercise on an active week, including when they mean the gym cannot provide it (hand off to `training-plan`; that skill writes `home_gym_substitutions`)
 - Invent meal plans, session logs, or `activity_logged` rows (instances belong in `training-log-and-review`)
 - Diagnose, or advise on medication
 - Write `user_profiles.data` before the user approves the summary
@@ -89,6 +90,22 @@ If they both confirm a habit and report doing it today, save the habit here, the
 
 Tell them in Swedish that the vana is the pattern; each time they do it they still say so (e.g. `yoga`, `gåband 30 min`) so it can be logged. Do not claim they already did it.
 
+### 3c. Routine-gym substitutions (optional, never a form)
+
+Do not ask “vilka maskiner saknas?” during gap-fill.
+
+If they volunteer that the routine gym lacks an exercise, and this is **not** a change to a planned item on an active week:
+
+- Propose **one** home alternative (same rules as `skills/training-plan/references/exercise-substitutions.md`).
+- Confirmation card: X saknas på rutin-gymmet; hemma-alternativ Y; förstahand X följer med till annat gym.
+- After `godkänn`, write the full `equipment.home_gym_substitutions` array. Keep unrelated pairs. Provenance key is `equipment.home_gym_substitutions`.
+
+If an active plan has that exercise this week, load `training-plan` instead so the session is updated in the same turn.
+
+`nu har gymmet X` / remove a pair: drop that object from the array, confirm, then `profile_updated`. If the array would be empty, omit the key from `data` and drop `equipment.home_gym_substitutions` from `provenance`. Do not save `[]`.
+
+Adding or removing pairs later: same as habits — full confirmed array, keep unrelated pairs.
+
 ### 4. Show a confirmation card
 
 In Swedish, clearly labelled:
@@ -116,7 +133,7 @@ Then insert `user_profiles` with:
 
 **Later save (row exists):**
 
-Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits`, write the full confirmed array (add, change, or remove items they approved).
+Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits` and `equipment.home_gym_substitutions`, write the full confirmed array (add, change, or remove items they approved).
 
 Do not UPDATE `events`.
 

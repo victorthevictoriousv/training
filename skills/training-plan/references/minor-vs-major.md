@@ -4,12 +4,15 @@ Use this after a plan is `active`. When unsure, treat the change as major.
 
 Do not change the profile for a one-week situation. `availability` / habits updates are onboarding, then a new week.
 
+**Exception:** they **mean** a planned exercise is unavailable at the routine gym (context, not a set phrase). That is gym fact (`equipment.home_gym_substitutions`), not a one-week squeeze. After one `godkänn`, update the plan item **and** the profile. A this-week swap without that meaning is plan-only. See `references/exercise-substitutions.md`.
+
 ## Minor (after approval: edit the active plan in place)
 
 Show **Förslag (sparas inte än)**. On explicit approval, `UPDATE plans.content`. If they do not approve, write nothing.
 
 - Change the exercises or structure of an already scheduled day
-- Swap an exercise for a close equivalent (same pattern and difficulty)
+- Swap an exercise for a close equivalent (same pattern and difficulty) **this week only** — do not write `preferred` or `home_gym_substitutions`
+- Gym-unavailable: replace the prescribed `name` with one home-gym substitute, set `preferred` to the original first choice, and merge the pair into `equipment.home_gym_substitutions`
 - Add or remove about one set
 - Move a session to another day in the same week
 - Turn one session into rest or easy recovery the same day if the user reports poor recovery, time pressure, or non-stop pain

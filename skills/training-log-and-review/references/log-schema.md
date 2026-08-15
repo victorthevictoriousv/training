@@ -18,7 +18,7 @@ See also `docs/data-contracts.md`.
 }
 ```
 
-- `exercise_key`: lowercase snake_case, stable. Prefer the planned item name slug when matched.
+- `exercise_key`: lowercase snake_case, stable. Prefer the planned item `key` when matched to `name`; prefer `preferred.key` when matched to `preferred.name`. Else slug from the user text.
 - `load_kg`: number when known. Null for bodyweight, time carries, or duration-only work.
 - `load_text`: always set (`24 kg`, `kroppsvikt`, `+12 kg`, `32 min`).
 - `reps`: integer or null for timed or distance work. Never a range. Never `reps_text`. If the user only gives `8–10`, store `8` (low end) and echo that.
@@ -26,6 +26,7 @@ See also `docs/data-contracts.md`.
 - `duration_min` / `distance_km`: for running or timed work; `load_kg` is then null.
 - Dumbbells and similar: `load_kg` is **per implement** (one dumbbell). `load_text` like `30 kg/hantel`.
 - Several working sets: one event with several objects in `sets`. Log every working set, even when they are identical.
+- Shortcut fill (`logga gympasset`): `raw_text` is their phrase. Optional `notes`: `enligt senaste`. Loads come from last working after `godkänn`, not from plan RPE.
 
 ## `session_completed` / `session_missed`
 

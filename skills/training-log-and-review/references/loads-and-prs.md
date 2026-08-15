@@ -14,6 +14,16 @@ Derived from `exercise_logged`. No extra table. Do not use `activity_logged` for
 
 Track what they actually give: load, reps, sets, RPE, run duration, run distance. Do not invent missing kg. Optional RPE on a log is worth saving when they say it — it explains the result.
 
+## Copy last working into today's log (shortcut)
+
+When they mean they completed the session (`logga gympasset`, `klarade alla övningar`, similar): last working may be copied into new `exercise_logged` rows **after** a summary card and one `godkänn`. Use the last-working query below (full `payload` / `sets`, not only kg).
+
+- Copy last `load_kg` and `load_text`. Dumbbell `/hantel` as last time. Bodyweight or timed with null `load_kg`: copy that.
+- Sets from today's plan. Reps from last log when set counts match, else planned low end.
+- Do not copy PR. Do not copy planned RPE or suggested kg from `item.load`. Do not auto-bump (+2.5 stays a plan-draft rule, not a log write).
+- No history, or no usable load for a loaded exercise → ask for kg; do not invent. Do not write until those answers are on the card and they `godkänn`.
+- Until `godkänn`, copied loads are not confirmed facts.
+
 ## Three numbers (strength)
 
 | Name | Meaning | Use |
@@ -22,7 +32,7 @@ Track what they actually give: load, reps, sets, RPE, run duration, run distance
 | Today's log | Latest log for that key on the session date | **Loggat** / today's result |
 | PR | Max `load_kg` ever for that key | Ceiling and “what is my PR?”. Not the default working weight |
 
-Last working beats PR for programming.
+Last working beats PR for programming and for the shortcut fill.
 
 ## Queries
 
@@ -93,7 +103,7 @@ Store on the set object: `duration_min` and/or `distance_km`, `load_kg` null.
 | PR duration | Max `duration_min` |
 | PR pace | Fastest min/km among logs with both distance and duration |
 
-No run history → RPE/prattempo from the plan. History → last duration/distance as the target. Do not jump to longest-ever PR.
+No run history → RPE/prattempo from the plan. History → last duration/distance as the target. Do not jump to longest-ever PR. Shortcut fill of a run session copies last duration/distance after the same card + `godkänn`.
 
 ## When to show PRs or results
 

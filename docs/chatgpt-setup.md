@@ -141,7 +141,7 @@ New chat: `Vad är dagens pass?`
 
 Expected: it runs SELECT, then shows only the sessions stored for today's date in the active plan, labelled **Sparat pass**. If the tool fails it says so and does not invent a workout.
 
-Then ask to change one exercise. Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in `plans.content` matches the new session. Without `godkänn`, `content` is unchanged.
+Then ask to **byt** one exercise (do not say it is missing at the gym). Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in `plans.content` matches the new session and `data.equipment.home_gym_substitutions` is unchanged. Without `godkänn`, `content` is unchanged.
 
 ### D3. Log a set and the session
 
@@ -150,6 +150,8 @@ In **träning**: `bänk 80x5` (or the name of a planned exercise).
 Expected: **Sparat:** … and a new `exercise_logged` row. Then `bänk 82.5` → another `exercise_logged`; latest load is 82.5.
 
 `logga dagens pass` then `resten enligt plan` without `godkänn`: no `session_completed`. After `godkänn`: `session_completed` and no invented `load_kg`.
+
+`logga gympasset` (or `klarade alla övningar`) without `godkänn`: no new `exercise_logged` / `session_completed`. If an exercise has no history, it asks for weight first and still does not write. After `godkänn` when history exists: one `exercise_logged` per remaining working item (loads = last working, not plan RPE) and `session_completed`. `bänk 80x5` still saves immediately without a second `godkänn`.
 
 ```sql
 select type, payload->>'date' as date, payload
@@ -201,6 +203,44 @@ Then `Lägg en veckoplan för nästa vecka.` Expected: draft `intent` mentions t
 `Vad är dagens pass?` Expected: **Sparat pass** is only programmed sessions, not the walks.
 
 Optional habit with a weekday: `Jag klättrar onsdagar ca 90 min, lägg in det i schemat.` After `godkänn`, a climbing habit with `plan_inclusion` `scheduled`. Next week draft has an `other` session on Wednesday with `habit_key`. `Klättrade 2h` that Wednesday → `activity_logged` plus `session_completed`. An extra climb on another day → `activity_logged` only.
+
+### D5. Gym-unavailable vs this-week swap
+
+After D (an `active` week exists). Pick a named strength exercise from that week. The prompts below are examples; the skill should also accept other wordings with the same meaning.
+
+First, this-week swap only: `Byt [övning] mot något annat.` Do not imply the gym lacks it.
+
+Expected: **Förslag (sparas inte än)**. After `godkänn`, that item's `name` in `plans.content` changed. No `preferred` from this swap. `data.equipment.home_gym_substitutions` unchanged. Without `godkänn` first, nothing written.
+
+Then gym-unavailable (same or another planned exercise): `[Övning] finns inte på gymmet, ge mig ett annat förslag.`
+
+Expected: **Förslag (sparas inte än)** with one home alternative and the original as first choice. Without `godkänn`: plan and profile unchanged. After `godkänn`:
+
+```sql
+select content
+from plans
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+  and status = 'active';
+
+select data->'equipment'->'home_gym_substitutions' as substitutions,
+       provenance->'equipment.home_gym_substitutions' as substitutions_provenance
+from user_profiles
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
+```
+
+Expected:
+
+- prescribed `name` / `key` is the home alternative
+- `preferred.name` / `preferred.key` is the original first choice
+- `home_gym_substitutions` contains that pair
+- provenance for `equipment.home_gym_substitutions`
+- a `profile_updated` event
+
+`Vad är dagens pass?` (or that day): **Sparat pass** shows the home exercise, then **Förstahand (annat gym):** and the original name.
+
+Next week draft should reuse the stored pair without asking again.
+
+`Nu har gymmet [originalövning].` After `godkänn`: that pair is gone from `home_gym_substitutions` (omit the key if the array is empty).
 
 ### E. End-to-end provenance
 

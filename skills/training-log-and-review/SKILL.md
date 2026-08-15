@@ -1,6 +1,6 @@
 ---
 name: training-log-and-review
-description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, extra-plan activity (walk, treadmill, yoga, climbing, hiking), a load correction, a PR question, how an exercise is progressing, or catching up habits after a quiet week. Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, or asks for last weights, personal bests, or results. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, run weekly reviews, or give meal plans.
+description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), a load correction, a PR question, how an exercise is progressing, or catching up habits after a quiet week. Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, or asks for last weights, personal bests, or results. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, run weekly reviews, or give meal plans.
 ---
 
 # training-log-and-review
@@ -11,7 +11,7 @@ Record what actually happened. Do not invent loads. Weekly review is not impleme
 
 - Create or rewrite the weekly plan (load `training-plan`)
 - Save a recurring habit to the profile (load `training-onboarding`)
-- Invent kilogram values the user did not state
+- Invent kilogram values the user did not state or confirm on the shortcut card (copied last working after one `godkänn` is allowed)
 - Store kcal, MET, or TDEE
 - UPDATE or DELETE `events`
 - Run DDL or weekly reviews
@@ -79,7 +79,7 @@ A profile habit is not done until `activity_logged`. If habit catch-up in `activ
 
 If the message is (or includes) an exercise + load and/or reps, parse with `references/parse-and-match.md`.
 
-- One clear match to today's planned items, or a clear new accessory: `INSERT` `exercise_logged` immediately. Echo **Sparat:** in Swedish (exercise, sets, kg, reps).
+- One clear match to today's planned items (`name` or `preferred.name`), or a clear new accessory: `INSERT` `exercise_logged` immediately. Echo **Sparat:** in Swedish (exercise, sets, kg, reps). Use the home `key` when they logged the prescribed name; use `preferred.key` when they logged the first-choice.
 - `reps` must be an integer or null. Never write a range or `reps_text`. Range-only input → low end, and say so in the echo.
 - Dumbbell `load_kg` is per implement (`30 kg/hantel`).
 - Store one object per working set (4×8 → four sets of 8), not a single set.
@@ -150,14 +150,36 @@ If `INSERT` fails because `type` is not allowed (`activity_logged` missing from 
 
 ### 4. Log the whole session
 
-Intent like `logga dagens pass`, `jag är klar`, `klart för idag`.
+Three intents. Match meaning, not exact wording. Do not copy planned RPE/load text into `load_kg`.
+
+Do not treat background walks or background yoga as remaining planned work. Mention them as **Utanför schema** if logged today. If they have habits and none are logged today, you may ask `Någon vana idag?` with their habit names — only when habit catch-up applies (quiet week) or they are wrapping **dagens pass**, not after every set. Scheduled habit sessions (climbing) are planned work — include them in **Loggat** / **Kvar**.
+
+**A. Wrap-up / status** (`logga dagens pass`, `jag är klar`, `klart för idag` — they want what is left, not a copy of last loads):
 
 1. List today's planned sessions and which exercises already have a current log.
 2. Show **Loggat** vs **Kvar**.
 3. If they give remaining loads in the same turn, parse those as step 2.
-4. If they say `resten enligt plan`: show what will be marked done **without weights**, wait for `godkänn`, then `session_completed` with `status = partial` if any planned strength work lacks loads, else `completed`.
-5. Do not copy planned RPE/load text into `load_kg`.
-6. Do not treat background walks or background yoga as remaining planned work. Mention them as **Utanför schema** if logged today. If they have habits and none are logged today, you may ask `Någon vana idag?` with their habit names — only when habit catch-up applies (quiet week) or they are wrapping **dagens pass**, not after every set. Scheduled habit sessions (climbing) are planned work — include them in **Loggat** / **Kvar**.
+
+**B. Shortcut — completed the session as last time** (`logga mitt gympass`, `logga gympasset`, `logga passet`, `jag körde hela passet`, `klarade alla övningar`, `allt som senast`):
+
+Filling from history is an assumption. Show a card, wait for one `godkänn`, then write. Do not write before approval. Do not auto-bump. Do not copy PR or plan `load` text.
+
+1. Also `SELECT` last working per `exercise_key` (any date) with the query in `references/loads-and-prs.md` (full `payload` / `sets`, not only kg). Use today's logs from step 1.
+2. Target session: `gympass` → today's strength session only. Bare `passet` on a run-only day → the run. Two sessions the same day and they did not name one: ask once. Pain, skip, or “inte alla”: ask once, do not write.
+3. Working items only: strength items with `sets` and `reps`, or a run item with duration/distance. Skip warmup and duration-only blocks (easy bike). Skip items already logged today.
+4. Default to the prescribed (home) `name` / `key`. If the item has `preferred`, put `Förstahand (annat gym): {name} — säg till om du körde den` on the card. Stay on the home key unless they switch before `godkänn`.
+5. Fill each remaining working item:
+   - **Load:** last working for that key. Copy `load_kg` and `load_text` (dumbbell `/hantel` as last time). Bodyweight or timed with last `load_kg` null: copy null + last `load_text`. That is not “missing”.
+   - **Sets:** today's planned set count. One set object per working set.
+   - **Reps:** if last log's set count equals today's planned sets, copy that per-set reps list; else planned low end (`8–10` → 8) and say so on the card.
+   - **Run** (only if this path includes the run): last duration/distance, not PR.
+6. Missing last working (no history, or last log has no usable load for a loaded exercise): ask **all** unknowns in one message (`Vilken vikt på X, Y?`). Do not show the save card until those are answered. Stated kg in that reply fill those rows.
+7. Card (Swedish, compact): session title + date; one line per remaining working item, e.g. `Hantelpress 4×8 @ 30 kg/hantel (enligt senaste)`; preferred hint if any. Wait for `godkänn`.
+8. After `godkänn`: `INSERT` one `exercise_logged` per remaining working item (same shape as step 2; `raw_text` = their phrase; optional `notes`: `enligt senaste`; `source` `user`, `source_status` `confirmed`). Then `session_completed` with `status = completed` if every planned working item for that session now has a current log, else `partial`. Echo **Sparat:** a short list with `(enligt senaste)` on copied rows. Already-logged items today stay unchanged.
+
+**C. Remaining according to plan, no loads** (`resten enligt plan`):
+
+Show what will be marked done **without weights**, wait for `godkänn`, then `session_completed` with `status = partial` if any planned strength work lacks loads, else `completed`. This is not the shortcut. Do not copy last working into `exercise_logged`.
 
 ```sql
 insert into events (
@@ -188,4 +210,4 @@ Swedish, one or two lines. Offer the next planned exercise if any remain. After 
 
 ## Dialogue
 
-Match intent. Keep replies short during a workout. Do not assume gåband or yoga happened unless they just logged it.
+Match intent. Keep replies short during a workout. Do not assume gåband or yoga happened unless they just logged it. Shortcut session fill waits for one `godkänn`; a single exercise line does not.
