@@ -13,7 +13,8 @@ Language: English identifiers. User-visible strings stored in JSON (titles, inte
 - Observations belong in `events` with `source_status = observation`.
 - AI conclusions belong in `events` with `source = ai` and `source_status = inference`, or later in `recommendations.rationale`.
 - `events` is append-only. Corrections are new rows, never UPDATE or DELETE.
-- After `0001_init.sql` is applied, ChatGPT must not run DDL. Schema changes belong in new migration files.
+- After the initial schema is applied, ChatGPT must not run DDL. Schema changes belong in new migration files.
+- RLS is enabled with no `anon`/`authenticated` policies. The Data API is denied. ChatGPT uses a privileged connection.
 
 ## Tables
 
@@ -72,7 +73,7 @@ Append-only history.
 | `payload` | `jsonb` not null | |
 | `created_at` | `timestamptz` not null | |
 
-v1 event types:
+Event types:
 
 - `safety_screening_completed`
 - `profile_confirmed`
@@ -80,6 +81,11 @@ v1 event types:
 - `plan_proposed`
 - `plan_activated`
 - `plan_superseded`
+- `exercise_logged`
+- `session_completed`
+- `session_missed`
+
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Do not UPDATE earlier rows.
 
 ### `recommendations`
 
@@ -281,6 +287,37 @@ Block items are intentionally loose in v1:
   "superseded_plan_id": null
 }
 ```
+
+`exercise_logged`
+
+```json
+{
+  "date": "2026-08-15",
+  "plan_id": "8755805b-b916-4e59-bb6a-e2a91ce9dd9d",
+  "session_id": "s1",
+  "exercise_key": "dumbbell_bench_press",
+  "exercise_name": "Dumbbell Bench Press",
+  "sets": [
+    { "load_kg": 80, "load_text": "80 kg", "reps": 5, "rpe": null }
+  ],
+  "raw_text": "bänk 80x5"
+}
+```
+
+`session_completed` / `session_missed`
+
+```json
+{
+  "date": "2026-08-15",
+  "plan_id": "8755805b-b916-4e59-bb6a-e2a91ce9dd9d",
+  "session_id": "s1",
+  "status": "completed",
+  "session_rpe": 7,
+  "notes": ""
+}
+```
+
+`status`: `completed | partial | missed`. For running, put duration/distance in `notes` or log a matching `exercise_logged` with `load_kg` null and duration in `load_text`.
 
 ## Identity in v1
 

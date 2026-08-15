@@ -5,7 +5,7 @@ v1 runtime: one ChatGPT Project, the GitHub connector, and the official Supabase
 ## 1. Supabase
 
 1. A dedicated Supabase project named `Training` already exists (`eqgfiaqqsmupbvcvcuce`, West EU / Ireland). Use that project.
-2. `0001_init.sql` has been applied. Confirm the four tables still exist:
+2. `0001_init.sql` and `0002_rls_and_log_events.sql` have been applied. Confirm the four tables still exist:
 
 ```sql
 select table_name
@@ -131,6 +131,22 @@ New chat: `Vad är dagens pass?`
 Expected: it runs SELECT, then shows only the sessions stored for today's date in the active plan, labelled **Sparat pass**. If the tool fails it says so and does not invent a workout.
 
 Then ask to change one exercise. Expected: **Förslag (sparas inte än)**. After `godkänn`, that day in `plans.content` matches the new session. Without `godkänn`, `content` is unchanged.
+
+### D3. Log a set and the session
+
+In **träning**: `bänk 80x5` (or the name of a planned exercise).
+
+Expected: **Sparat:** … and a new `exercise_logged` row. Then `bänk 82.5` → another `exercise_logged`; latest load is 82.5.
+
+`logga dagens pass` then `resten enligt plan` without `godkänn`: no `session_completed`. After `godkänn`: `session_completed` and no invented `load_kg`.
+
+```sql
+select type, payload->>'date' as date, payload
+from events
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+  and type in ('exercise_logged', 'session_completed', 'session_missed')
+order by created_at;
+```
 
 ### E. End-to-end provenance
 

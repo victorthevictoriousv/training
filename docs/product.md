@@ -35,23 +35,26 @@ v1 implements:
 
 - shared safety, autonomy, and provenance rules
 - four tables: `user_profiles`, `plans`, `events`, `recommendations`
+- RLS enabled with no anon policies (Data API denied)
 - `training-onboarding`
-- `training-plan` for the first weekly plan
+- `training-plan` for the weekly plan and showing saved sessions
+- `training-log-and-review` for exercise and session logging (not weekly review)
 
 v1 does not implement:
 
-- `training-log-and-review` (logging, missed sessions, weekly review)
+- weekly reviews inside `training-log-and-review`
 - `training-nutrition` (meal suggestions)
-- auth, RLS policies, multiple users, admin, or invites
+- auth, user-scoped RLS policies, multiple users, admin, or invites
 - a web app, custom backend, custom MCP server, or background jobs
 - Garmin read/write
 - automatic research monitoring
 - periodization engines or dedicated PR tables
 - publishing as an OpenAI plugin
+- auto-progressing loads into the next week's proposal
 
 ## Skills
 
-Four skills are in scope for the product. Only the first two exist as files in v1.
+Four skills are in scope for the product. Nutrition is still a stub; weekly review inside the log skill is not implemented.
 
 ### `training-onboarding`
 
@@ -59,11 +62,11 @@ Collects profile data progressively, identifies missing fields for later capabil
 
 ### `training-plan`
 
-Creates and changes weekly plans across the modalities the user actually chose. Reads only confirmed profile data. Writes `plans` and `events`. May apply minor reversible tweaks inside an already active plan. Larger changes require a new proposed plan and approval. Does not log completed sessions.
+Creates and changes weekly plans across the modalities the user actually chose. Reads confirmed profile data and, when showing a day, the latest logs for that date. Writes `plans` and plan events. Does not log completed sets.
 
-### `training-log-and-review` (deferred)
+### `training-log-and-review`
 
-Logs completed and missed sessions, metrics, and observations. Runs weekly reviews. Writes append-only `events`. May propose adjustments; must not silently activate major plan changes.
+Logs completed and missed sessions and per-exercise sets (load, reps, optional RPE). Writes append-only `events`. Weekly reviews are not implemented yet. Must not activate major plan changes.
 
 ### `training-nutrition` (deferred)
 

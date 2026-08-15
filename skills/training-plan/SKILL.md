@@ -1,6 +1,6 @@
 ---
 name: training-plan
-description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see, do, or change planned training — including today's session, tomorrow, a named day, the weekly plan, or similar phrasing. Match intent, not exact wording. Do not use for profile collection, session logging, weekly reviews, or meal plans.
+description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, or similar phrasing. Match intent, not exact wording. Do not use for logging completed sets or skipped sessions (that is training-log-and-review), profile collection, weekly reviews, or meal plans.
 ---
 
 # training-plan
@@ -10,7 +10,7 @@ Create one ISO week of training from the confirmed profile. Draft in chat. Write
 ## Do not
 
 - Collect a new profile (load `training-onboarding` instead)
-- Log completed or missed sessions
+- Log completed sets (load `training-log-and-review` instead)
 - Write meal plans or `recommendations`
 - Activate a plan when `safety_status` is `stop` or `unknown`
 - Add modalities the user did not confirm
@@ -86,11 +86,26 @@ Use this whenever the user wants to see or change planned training for today, to
 
 **Read first. Always.** Run the `SELECT` in step 1 in this turn. Do not use an earlier chat message as the source of the workout.
 
+Also load today's logs (do not skip this when presenting a day):
+
+```sql
+select payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type = 'exercise_logged'
+  and payload->>'date' = :date
+order by occurred_at desc;
+```
+
+Keep the latest row per `payload.exercise_key`.
+
 - If the Supabase tool fails or returns an error: say in Swedish that you could not read the saved plan. Stop. Do not invent a session.
 - If there is no `active` plan: say so and offer to create a week (step 2–3). Do not invent a session.
 - Resolve the date in `Europe/Stockholm` (today unless the user named a date). Find that date in `content.days`.
 - If `sessions` is empty: tell them the saved plan has rest that day.
 - Otherwise present those sessions in Swedish as **Sparat pass**. Mention the plan title and date. Do not add exercises that are not in `content`.
+- Next to matching exercises, show **Loggat** from the latest log (kg × reps). Planned load stays visible if no log exists.
+- If they are reporting what they lifted, switch to `skills/training-log-and-review/SKILL.md`. Do not treat a log line as a plan rewrite.
 
 If they want to change that day:
 

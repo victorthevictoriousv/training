@@ -10,7 +10,8 @@ v1 is a ChatGPT Project that:
 
 - follows versioned skills in this repo
 - reads and writes four Supabase tables through the official Supabase ChatGPT app
-- confirms facts with the user before saving them
+- confirms facts with the user before saving profile and plan drafts
+- logs explicit exercise lines without a second confirmation
 - creates a first weekly plan only after the profile is confirmed
 
 v1 is not a web app, not a custom backend, and not a custom MCP server.
@@ -37,7 +38,8 @@ supabase/migrations/   Versioned Postgres schema
 | [docs/chatgpt-project-instructions.md](docs/chatgpt-project-instructions.md) | Paste into the ChatGPT Project named **träning** |
 | [docs/data-contracts.md](docs/data-contracts.md) | Tables, JSON payloads, provenance |
 | [skills/training-onboarding/](skills/training-onboarding/) | Collect and confirm the profile |
-| [skills/training-plan/](skills/training-plan/) | Create and activate a weekly plan |
+| [skills/training-plan/](skills/training-plan/) | Create, show, and change the weekly plan |
+| [skills/training-log-and-review/](skills/training-log-and-review/) | Log sets, loads, and completed or missed sessions |
 | [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) | Initial schema |
 
 ## Language
