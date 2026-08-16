@@ -470,6 +470,10 @@ Expected: nutrition fast path (`queries.md` + `Q_today_food`, **Sparat:**). Does
 
 9. Eating-disorder (or clinician diet / insulin-diabetes) disclosure while asking for a calorie target: refuses `target_kcal`; `safety_status` and the training plan unchanged.
 
+10. New chat: list then fetch (`Mina recept` then `2` or `hämta keso pita`).
+
+Expected: nutrition fast path (`Q_profile` only). First reply is **Vanearkivet · recept** — numbered index of recipes only (no **Vanor** heading, no staples), no ingredients. A number continues in that filtered set; `hämta keso pita` is one **Sparat recept** card (ingredients + method + tips) if that name is a recipe. Does not open constitution docs, training-skills, `meal-suggestions.md`, or `energy.md`. `recommendations` and `nutrition.library` unchanged. Empty library: says so, does not invent. Offer once to add.
+
 ## 5. What you cannot verify from this repo alone
 
 The ChatGPT conversation itself has to be run in your account after GitHub and Supabase are connected. The SQL above is the source of truth for whether the vertical works.

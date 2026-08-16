@@ -5,10 +5,13 @@ description: Give meal suggestions from confirmed nutrition preferences, the
   wants lunch/dinner/evening ideas, asks how to fuel a session or recover from
   one, reports a meal they ate, logs a body weight, wants to save a recipe or
   food staple from a suggestion, asks how diet is going, wants the calorie
-  target reviewed against training and food, mentions a food reaction, or asks
-  about saved nutrition preferences. Meal log / weigh-in / saved prefs follow
-  the nutrition fast path (queries.md only) when there is no suggestion or
-  follow-up. Match intent, not exact wording. Do not use to collect the first
+  target reviewed against training and food, mentions a food reaction, asks
+  about saved nutrition preferences, or wants to list or fetch saved recipes
+  and food staples (mina recept, vanearkivet, hämta keso pita). Meal log /
+  weigh-in / saved prefs / vanearkivet browse follow the nutrition fast path
+  (queries.md only, plus §8 for vanearkivet presentation) when there is no
+  suggestion or follow-up. Match intent,
+  not exact wording. Do not use to collect the first
   nutrition profile (training-onboarding), create or change weekly training
   plans (training-plan), log exercises or extra-plan activity, or give a
   weekly training overview (training-log-and-review). Do not diagnose
@@ -45,19 +48,21 @@ Classify once. Run only those ids from `skills/_shared/queries.md`. Match meanin
 | Reported a meal (“åt X”, “vanlig lunch”) | §4 | `Q_profile`, `Q_today_food` | plan writes |
 | Weigh-in (“väger 88,6”, “ny vikt”) | §7 | `Q_profile` | auto-changing `target_kcal` |
 | Save this suggestion as a staple/recipe | §5 | `Q_profile` | `food_logged` unless they also ate it |
+| List vanearkivet / mina recept / matvanor, or fetch one (name or number) | §8 | `Q_profile` | meal suggestion, constitution, `food_logged` |
 | Reported food reaction / new allergy | §3 | `Q_profile` | writing it here |
-| “What preferences do you have saved?” / calorie target | §1 | `Q_profile` | others |
+| “What preferences do you have saved?” / calorie target | §1 | `Q_profile` | others, including dumping full recipes (that is §8) |
 | First-time diet setup, change goal/allergies/kitchen | hand off to `training-onboarding` §3d | `Q_profile` if already loaded | writes here |
 
 ## Before you start
 
-Classify intent first. Then read **only** the files that row needs. Do not open the others in this turn. Do not load a generic Supabase skill to run `Q_*`. Do not open `docs/safety.md` or `docs/data-contracts.md` (safety gate and SQL shapes are in this file). A log / weigh-in / prefs lookup that already followed the project-instruction fast path should not re-open this skill’s references.
+Classify intent first. Then read **only** the files that row needs. Do not open the others in this turn. Do not load a generic Supabase skill to run `Q_*`. Do not open `docs/safety.md` or `docs/data-contracts.md` (safety gate and SQL shapes are in this file). A log / weigh-in / prefs / vanearkivet lookup that already followed the project-instruction fast path should not re-open this skill’s references.
 
 **Level A — log or suggest** (no constitution docs):
 
 | Intent | Read now |
 | --- | --- |
 | Saved prefs / calorie target (§1) | `skills/_shared/queries.md` |
+| Vanearkivet list or fetch one (§8) | `queries.md` |
 | Meal/snack suggestion (§2) | `queries.md`, `references/meal-suggestions.md`, `references/library.md`. Also `references/energy.md` only if they asked about amount/energy |
 | Food reaction / new allergy (§3) | `queries.md` |
 | Reported a meal (§4) | `queries.md` |
@@ -78,6 +83,8 @@ Use `USER_ID` from the Project instructions. Filter every query on that id.
 ### 1. Saved preferences
 
 Run `Q_profile`. Answer from confirmed `data.nutrition` and `data.body` only. Missing keys are unknown, not a guess. If they want to add or change a field other than `nutrition.library` in this turn, hand off to `training-onboarding`. Do not write those fields here.
+
+Do not dump `nutrition.library` ingredients or methods here. If the library exists: one line with counts (`N recept`, `M vanor`) and that `mina recept` shows the index. Missing library: say the vanearkivet is empty. Listing or fetching items is §8.
 
 If they ask what their calorie target is: print confirmed `nutrition.energy.target_kcal` if present, and that it is a working number they can change. Do not open `references/energy.md` here. If they want BMR/TDEE or a review against this week’s training and food, go to §6.
 
@@ -242,6 +249,59 @@ If `INSERT` fails because the type is missing: say the live schema is missing `b
 
 Changing goal, allergies, or kitchen is still `training-onboarding` §3d.
 
+### 8. Vanearkivet (browse)
+
+Read-only index, then one full card. Run `Q_profile`. Do not write. Do not open `meal-suggestions.md`, `energy.md`, or constitution docs. Adding, changing, or removing items is `training-onboarding` §3d (or §5 in a suggestion turn). “vad ska jag äta” is §2, not this section.
+
+Missing `nutrition.library` → say the vanearkivet is empty. Do not invent items. Offer once to add.
+
+Chat history may hint at a filter or a number. The live array is the source. Re-sort every turn.
+
+**Stable sort** (after the filter below): `kind = recipe` first, then `kind = staple` (missing `kind` counts as staple). Within a group, `name` ascending, `sv-SE`, case-insensitive. Number `1…n` across that filtered list.
+
+**Filter** (meaning, not a phrase list). Apply before numbering:
+
+- Whole archive (`vanearkivet`, “vad har jag sparat för mat”, lista without a kind) → no kind/slot filter
+- Recept only (`mina recept`, `lista recept`) → `kind = recipe`. If they clearly mean the whole archive, do not filter by kind
+- Vanor only (`matvanor`, vanor i köket) → `kind = staple`
+- Slot (`recept till lunch`, middag, frukost, kväll, mellanmål) → `slots` contains that value. Missing `slots` → drop from a slot filter
+- Kind + slot (`recept till lunch`) → combine both filters (AND)
+- Name fragment (`bröd`, `pita`) → `name` or `key` contains it (case-insensitive). One match and they asked to fetch → full card. Several → index of those matches. None → say unknown; show the unfiltered index once
+
+If a filter yields nothing: say so, then the unfiltered index. Label a filtered index **Vanearkivet · {filter}** and number only that set.
+
+**Index vs fetch.** Match meaning:
+
+- List → index card only. No ingredients, no method
+- Fetch (`hämta`, `receptet på X`, `visa X`, a number, `hela receptet`) → one full card
+- A number uses this turn’s sort. If they are clearly continuing a filtered index from this chat, keep that filter; otherwise unfiltered. Out of range → say so and show that same index
+- Bare name: fetch if they meant the recipe (browse context, or `recept`). Log §4 if they meant they ate it (`åt`, a slot). Ask once if unclear
+- Several name matches → ask which one. Do not print two full cards
+
+**Index card** — label **Vanearkivet**. Omit an empty group heading.
+
+```text
+**Vanearkivet** (N)
+
+**Recept**
+1. {name} — {slots sv} · {time_min} min
+2. …
+
+**Vanor**
+3. {name} — {slots sv}
+
+Säg ett nummer eller namn för hela receptet.
+```
+
+Slot labels: `breakfast` frukost, `lunch` lunch, `dinner` middag, `evening` kväll, `snack` mellanmål. Show `time_min` only when present. Do not print `key`, kcal, or `notes` on the index.
+
+**Full card** — one item. Label **Sparat recept** (`kind = recipe`) or **Sparad vana** (`staple`).
+
+- Recipe: name; servings if set; slots; `time_min` if set; ingredients as a list (`amount` `unit` `name`); `method`; `notes` under **Tips** (not facts)
+- Staple: name; slots; `notes` if any
+- No JSON, no `key` unless they asked, no kcal/macros/protein. Those stay **Mina slutsatser** only if they asked
+- Do not list the rest of the archive. One line: `Övriga: säg mina recept` (recipe) or `Övriga: säg matvanor` (staple)
+
 ## Dialogue
 
-Speak Swedish. Keep it short. Always label suggestions **Förslag**. Never present a meal as a saved fact unless it is in `nutrition.library` or they just logged it. Never present BMR/TDEE as confirmed.
+Speak Swedish. Keep it short. Always label suggestions **Förslag**. Label the archive **Vanearkivet**, a fetched recipe **Sparat recept**, a fetched staple **Sparad vana**. Never present a meal as a saved fact unless it is in `nutrition.library` or they just logged it. Never present BMR/TDEE as confirmed.

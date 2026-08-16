@@ -1,6 +1,6 @@
 ---
 name: training-onboarding
-description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, they want to set up diet (jag vill sätta upp kosten), they mention body weight / height / calorie target, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, log meals or weigh-ins (training-nutrition), or give meal suggestions (training-nutrition).
+description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, they want to set up diet (jag vill sätta upp kosten), they mention body weight / height / calorie target, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, log meals or weigh-ins (training-nutrition), give meal suggestions, or list/fetch the food library (training-nutrition §8).
 ---
 
 # training-onboarding
@@ -12,6 +12,7 @@ Collect profile data, run a safety screen, and write confirmed facts only after 
 - Create or activate weekly plans (hand off to `training-plan`)
 - Swap or substitute a **planned** exercise on an active week, including when they mean the gym cannot provide it (hand off to `training-plan`; that skill writes `home_gym_substitutions`)
 - Invent meal plans, session logs, `activity_logged` rows, or `food_logged` rows (meal instances belong in `training-nutrition`)
+- List or fetch the food library (`mina recept`, `vanearkivet`, `hämta` a recipe) — that is `training-nutrition` §8
 - Diagnose, or advise on medication
 - Write `user_profiles.data` before the user approves the summary
 - Replace all of `user_profiles.data` on a later save (`data = :data` drops unrelated keys)
@@ -28,6 +29,7 @@ Classify once. Run only those ids from `skills/_shared/queries.md`. Writes stay 
 | Update a confirmed field (goals, time, equipment, injuries) | §1, then confirmation | `Q_profile` | Plan UPDATE, session logs |
 | `lägg till vana` / `ändra vana` / `ta bort vana` | §3b | `Q_profile` | Covering-plan writes, `activity_logged` |
 | Set up diet, body measures, calorie target, kitchen, change goal/allergies, `lägg till matvana` without a live suggestion | §3d | `Q_profile` | Meal suggestions, `food_logged` |
+| List/fetch food library (`mina recept`, `vanearkivet`, `hämta` X) | hand off to `training-nutrition` §8 | — | writes here |
 | Add/remove gym-substitution pairs with no live session, or “nu har gymmet X” | confirmation then profile write | `Q_profile` | `training-plan` session UPDATE |
 | They want a week but minimum fields are missing | this skill first, then `training-plan` | `Q_profile` | Drafting a full week from guesses |
 
@@ -137,7 +139,7 @@ Ask, in this order, only for gaps:
 5. Library once: *Vad äter du ofta till lunch eller middag?* Same spirit as §3b. `nej` / `hoppa` → omit `nutrition.library`. Do not save `[]`
 6. If the calorie-target minimum in `references/profile-fields.md` is present and no clinical flag: load `skills/training-nutrition/references/energy.md`, compute BMR/TDEE as **Mina slutsatser**, propose `target_kcal` on the confirmation card. Wait for `godkänn`. Never write BMR/TDEE
 
-`lägg till matvana` / `spara receptet` / `ta bort` a library item with no live meal suggestion: load current `nutrition.library`, draft the merged list, confirm, then `profile_updated`. Keep unrelated items. Provenance key is `nutrition.library` for the whole array. If they are in a meal-suggestion turn, `training-nutrition` may write the library instead.
+`lägg till matvana` / `spara receptet` / `ta bort` a library item with no live meal suggestion: load current `nutrition.library`, draft the merged list, confirm, then `profile_updated`. Keep unrelated items. Provenance key is `nutrition.library` for the whole array. If they are in a meal-suggestion turn, `training-nutrition` may write the library instead. Listing or fetching saved items without changing them is `training-nutrition` §8, not this section.
 
 Updating `body.weight_kg`: if they report a weigh-in (`väger 88,6`), `training-nutrition` §7 logs `body_weight_logged` and syncs the profile. If they change weight as a profile edit here, write the new weight after approval **and** insert `body_weight_logged` for that date so history stays complete. Recalculate and **propose** a new `target_kcal`; do not overwrite the old target without a new `godkänn` (`energy.md` stale rule). `justera kalorimål` / follow-up against this week’s training and food is `training-nutrition` §6.
 

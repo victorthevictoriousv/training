@@ -1,5 +1,5 @@
 ---
-description: Named Q_* reads skip the generic Supabase skill; training show-saved-session and nutrition log/weigh-in/prefs are fast paths
+description: Named Q_* reads skip the generic Supabase skill; training show-saved-session and nutrition log/weigh-in/prefs/vanearkivet are fast paths
 alwaysApply: true
 ---
 
@@ -16,14 +16,15 @@ When the user only wants to **see** today / tomorrow / a named day / this week /
 
 If they then ask to change the plan or draft a week, load `skills/training-plan/SKILL.md` and follow its intent-gated reads.
 
-## Nutrition — log, weigh-in, saved prefs
+## Nutrition — log, weigh-in, saved prefs, vanearkivet
 
-When the user only reports a meal they ate (`åt X`, `vanlig lunch`), a weigh-in (`väger 88,6`), or asks what nutrition preferences / calorie target are saved — **no** meal suggestion, **no** “hur går kosten”, **no** save-recipe, **no** first-time diet setup:
+When the user only reports a meal they ate (`åt X`, `vanlig lunch`), a weigh-in (`väger 88,6`), asks what nutrition preferences / calorie target are saved, or wants to **list or fetch** the food library (`mina recept`, `vanearkivet`, `hämta keso pita`, a number after a list) — **no** meal suggestion, **no** “hur går kosten”, **no** save-recipe, **no** first-time diet setup. A bare library name with no verb (`Keso pita`) follows §8 Bare name (ask once if unclear) — not an automatic meal log:
 
-1. Open `skills/_shared/queries.md` only.
+1. Open `skills/_shared/queries.md` only. Do not open `training-nutrition` except the §4 / §7 SQL or §8 presentation if needed.
 2. Meal: `Q_today_food` (and `Q_profile` if named library / `enligt vana`). Copy the `INSERT` from `skills/training-nutrition/SKILL.md` §4 if the SQL is not already in context — ignore that skill’s Before you start list. Echo **Sparat:**. Stop.
 3. Weigh-in: `Q_profile`. Copy the `INSERT` and weight sync from §7 the same way. Do not rewrite `target_kcal`. Echo **Sparat:**. Stop.
-4. Saved prefs / calorie target: `Q_profile`. Answer from confirmed `data.nutrition` / `data.body`. Stop.
+4. Saved prefs / calorie target: `Q_profile`. Answer from confirmed `data.nutrition` / `data.body`. Do not dump library ingredients. One line with vanearkivet counts if the library exists. Stop.
+5. Vanearkivet list or fetch: `Q_profile`. Present from `data.nutrition.library` per `skills/training-nutrition/SKILL.md` §8 (stable sort, case-insensitive, index vs one full card). Ignore that skill’s Before you start list. Empty library → say so. Do not invent. Offer once to add. Stop.
 
 “vad ska jag äta” / “hur går kosten” / save recipe → load `skills/training-nutrition/SKILL.md` and follow its intent-gated reads. Same message “hur gick veckan och kosten” → log skill §8 first, then nutrition §6.
 

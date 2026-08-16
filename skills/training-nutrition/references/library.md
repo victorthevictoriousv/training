@@ -45,3 +45,5 @@ After `godkänn`, write the full confirmed array. Keep unrelated items. Drop the
 ## Using the library
 
 Prefer matching `slots` for the ask. Vary items when they want lunch + dinner + evening. Named log line without detail fills `name` / `library_key` and echoes `(enligt vana)`.
+
+Listing or fetching saved items (index then one full card) is `training-nutrition` §8. Do not dump the whole array as recipes on a prefs question.

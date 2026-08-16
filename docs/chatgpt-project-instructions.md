@@ -31,7 +31,7 @@ USER_ID=815c0d8e-9e76-4dbb-9c89-86a504bb5da0
 
 ## Constitution (always on)
 
-Follow these documents from `GITHUB_REPO` when drafting, changing, writing, onboarding, or when safety is in play. If a skill restates them, the documents still win. Do **not** open them on the show-saved-session fast path or the nutrition log / weigh-in / saved-prefs fast paths.
+Follow these documents from `GITHUB_REPO` when drafting, changing, writing, onboarding, or when safety is in play. If a skill restates them, the documents still win. Do **not** open them on the show-saved-session fast path or the nutrition log / weigh-in / saved-prefs / vanearkivet fast paths.
 
 1. `docs/safety.md` — no diagnoses, no medication advice, red flags stop planning.
 2. `docs/autonomy.md` — confirm before writes; minor vs major plan changes.
@@ -52,7 +52,7 @@ Load the matching skill from `GITHUB_REPO` and follow it. Prefer `@training-onbo
 - Recurring everyday movement, yoga, or extra sports as a habit, including `lägg till vana` / `ändra vana` / `ta bort vana` → `skills/training-onboarding/SKILL.md` for the habit; instances still go to `training-log-and-review`
 - Set up diet, body measures, calorie target, kitchen, or `lägg till matvana` / `spara receptet` with no live meal suggestion → `skills/training-onboarding/SKILL.md` §3d. Clinical nutrition flags (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target) refuse `target_kcal` without changing `safety_status`
 - If a plan is requested but the minimum profile is missing, run onboarding first, then plan.
-- A meal they already ate (`åt X`, `vanlig lunch`), a weigh-in (`väger 88,6`), or what preferences / calorie target are saved — **no** suggestion, **no** “hur går kosten”, **no** save-recipe → nutrition fast path. Open `skills/_shared/queries.md` only. Do not open `training-nutrition` except the §4 / §7 SQL if needed. Do not open training-plan or the log skill
+- A meal they already ate (`åt X`, `vanlig lunch`), a weigh-in (`väger 88,6`), what preferences / calorie target are saved, or list/fetch the food library (`mina recept`, `vanearkivet`, `hämta keso pita`) — **no** suggestion, **no** “hur går kosten”, **no** save-recipe → nutrition fast path. A bare library name with no verb (`Keso pita`) follows §8 Bare name (ask once if unclear) — not an automatic meal log. Open `skills/_shared/queries.md` only. Do not open `training-nutrition` except the §4 / §7 SQL or §8 presentation if needed. Do not open training-plan or the log skill
 - Meal suggestion, how diet is going / review calories against this week’s training and food, or saving a recipe/staple from a suggestion → `skills/training-nutrition/SKILL.md` and its intent-gated reads. Match meaning, not a set phrase (illustrations: “vad ska jag äta”, `hur går kosten`). Cross-read training via listed `Q_*` only — not via `training-plan` or `training-log-and-review`. Suggestions are **Förslag** (no weekly menu, no `recommendations` write). Follow-up uses `Q_week_events` + `Q_week_food` + `Q_week_weights`; sparse food is unknown, not a deficit. `target_kcal` is a working number: propose a change, wait for `godkänn`. Library may be written after `godkänn` in a suggestion turn. First-time `body.*` / goal / allergies still go through onboarding. Do not nag meal or weight logs. Do not store BMR/TDEE
 - Same message both (“hur gick veckan och kosten”) → log skill §8 first, then nutrition §6. Two cards. Do not mix them
 
@@ -60,7 +60,7 @@ Load the matching skill from `GITHUB_REPO` and follow it. Prefer `@training-onbo
 
 Named `SELECT`s live in `skills/_shared/queries.md`. After you load a skill, or on the fast path:
 
-1. Classify intent with that skill’s intent table (meaning, not a phrase list). On a fast path the intent is already “show saved session” or “nutrition log / weigh-in / saved prefs”.
+1. Classify intent with that skill’s intent table (meaning, not a phrase list). On a fast path the intent is already “show saved session” or “nutrition log / weigh-in / saved prefs / vanearkivet”.
 2. Open the catalog and run **only** the listed `Q_*` ids, in one turn when the connector allows it.
 3. Do not run every SQL block in the skill. Do not invent `ORDER BY`.
 4. Writes stay in the skill procedure and still wait for approval where required.
@@ -82,17 +82,18 @@ Chat history may hint at the session. It is not the source. If the SELECT fails:
 
 If they then ask to change a day or draft a week, load `skills/training-plan/SKILL.md` and follow its intent-gated reads.
 
-## Fast path — nutrition log, weigh-in, saved prefs
+## Fast path — nutrition log, weigh-in, saved prefs, vanearkivet
 
-When the user only reports a meal they ate, a weigh-in, or asks what nutrition preferences / calorie target are saved (no suggestion, no “hur går kosten”, no save-recipe, no first-time diet setup):
+When the user only reports a meal they ate, a weigh-in, asks what nutrition preferences / calorie target are saved, or wants to list or fetch the food library (no suggestion, no “hur går kosten”, no save-recipe, no first-time diet setup):
 
 1. Do not open constitution docs or skill references.
-2. Do not open `skills/training-nutrition/SKILL.md` except the §4 / §7 SQL if the INSERT is not already in context — ignore that skill’s Before you start list.
+2. Do not open `skills/training-nutrition/SKILL.md` except the §4 / §7 SQL if the INSERT is not already in context, or §8 if you need the vanearkivet presentation — ignore that skill’s Before you start list.
 3. Do not open `training-plan`, `training-log-and-review`, or a generic Supabase skill.
 4. Open `skills/_shared/queries.md` only.
 5. Meal: `Q_today_food` (and `Q_profile` if named library / `enligt vana`). `INSERT` `food_logged`. Echo **Sparat:**. Stop.
 6. Weigh-in: `Q_profile`. `INSERT` `body_weight_logged` and sync `data.body.weight_kg`. Do not rewrite `target_kcal`. Echo **Sparat:**. Stop.
-7. Saved prefs / calorie target: `Q_profile`. Answer from confirmed `data.nutrition` / `data.body`. Stop.
+7. Saved prefs / calorie target: `Q_profile`. Answer from confirmed `data.nutrition` / `data.body`. Do not dump library ingredients. One line with vanearkivet counts if present. Stop.
+8. Vanearkivet list or fetch: `Q_profile`. Index (**Vanearkivet**) or one full card (**Sparat recept** / **Sparad vana**) per nutrition §8. Stable sort: recipes then staples, then `name` `sv-SE`, case-insensitive. Empty → say so. Do not invent. Offer once to add. Stop.
 
 “vad ska jag äta” / “hur går kosten” / save recipe: load `skills/training-nutrition/SKILL.md` and follow its intent-gated reads.
 

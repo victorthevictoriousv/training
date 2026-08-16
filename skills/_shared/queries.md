@@ -4,7 +4,7 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 ## How to run
 
-1. Classify intent with the skill’s intent table. On the show-saved-session or nutrition log / weigh-in / prefs fast path, skip that and use the ids listed there.
+1. Classify intent with the skill’s intent table. On the show-saved-session or nutrition log / weigh-in / prefs / vanearkivet fast path, skip that and use the ids listed there.
 2. Open this file and copy **only** the listed ids (the groups below are orientation, not extra queries).
 3. Replace `:USER_ID` from Project instructions. Never invent another user.
 4. Replace other `:placeholders` from the skill (`:date` is the session date in `Europe/Stockholm`; `:today` is today’s date there).
@@ -25,7 +25,7 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 **Nutrition week / follow-up:** `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits`
 
-**Nutrition log / prefs:** `Q_profile`, `Q_today_food`
+**Nutrition log / prefs / vanearkivet:** `Q_profile`, `Q_today_food`
 
 Nutrition never runs `Q_pr`, `Q_last_working`, `Q_recent_working`, `Q_lazy_activate_candidate`. Training never runs `Q_today_food`, `Q_week_food`, `Q_week_weights` unless the same message also asked about diet.
 
