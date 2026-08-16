@@ -1,11 +1,11 @@
 ---
 name: training-log-and-review
-description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, or catching up habits after a quiet week. Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, or asks for last weights, personal bests, or results. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, run weekly reviews, or give meal plans. If they also want extra work put in the week or remaining days adapted, log first, then load training-plan.
+description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, catching up habits after a quiet week, or a weekly overview of what happened (hur gick veckan / sammanfatta / vad har jag gjort på veckonivå). Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, asks for last weights, personal bests, or results, or wants a read-only summary of the covering week. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, or give meal plans. If they also want extra work put in the week, remaining days adapted, or next week drafted, log or show the overview first, then load training-plan.
 ---
 
 # training-log-and-review
 
-Record what actually happened. Do not invent loads. Weekly review is not implemented; say so if asked.
+Record what actually happened. Do not invent loads.
 
 ## Do not
 
@@ -14,7 +14,7 @@ Record what actually happened. Do not invent loads. Weekly review is not impleme
 - Invent kilogram values the user did not state or confirm on the shortcut card (copied last working after one `godkänn` is allowed)
 - Store kcal, MET, or TDEE
 - UPDATE or DELETE `events`
-- Run DDL or weekly reviews
+- Run DDL
 - Attach unmatched gym work to another session the same day, or write `session_completed` for extra work that is not in `content`
 - Auto-rewrite remaining days because they logged extra. Offer a reshape if it conflicts; wait
 
@@ -33,6 +33,7 @@ Classify once (meaning, not a phrase list). Run only those ids from `skills/_sha
 | “Vad är mitt PR?” / personbästa | §6 | `Q_pr` | Covering-plan writes, last working as the answer |
 | “Hur går bänken?” / utveckling | §6 | `Q_recent_results` | PR as a headline, plan writes |
 | Last weight / lägg på X kg (asked) | §6 | `Q_last_working` | `Q_pr` unless they also asked PR |
+| Week overview (“hur gick veckan”, sammanfatta, “vad har jag gjort?” på veckonivå) | §8 | `Q_covering_plan`, `Q_week_events`, `Q_habits`, `Q_queued_next_week` | `Q_pr`, `Q_recent_results`, `Q_lazy_activate_candidate`, `Q_last_working`, `Q_today_logs` / `Q_today_activity` (not ×7), `Q_activity_lookback`, `Q_habit_last_dates` |
 
 ## Before you start
 
@@ -206,6 +207,46 @@ Swedish, one or two lines. Offer the next planned exercise if any remain. After 
 
 If you just logged extra lower-body strength (unmatched to today's plan, or they said it was extra gym) and that date still has a planned quality run that is not completed: in the same turn, say in Swedish that quality running should not follow heavy lower body, and offer to swap it to 30–40 min easy jogging. Do not UPDATE the plan unless they then ask; that is `training-plan`. Easy gåband or yoga does not trigger this.
 
+### 8. Weekly overview (chat only)
+
+How the covering week went. Read and tell. Do not write. Mid-set gym logs, `logga gympasset`, and one day’s **Sparat pass** are not this intent.
+
+Do not open `references/loads-and-prs.md`. Do not run `Q_pr` or `Q_last_working`. Do not lazy-activate. Do not run `Q_today_logs` / `Q_today_activity` for each day of the week.
+
+`:date` = today in `Europe/Stockholm` unless they named last week or a date. If they named a week, use a day in that week only as the `Q_covering_plan` lookup; the event window is that row’s `period_start`–`period_end`, never a guessed Monday.
+
+1. Run `Q_covering_plan`. No row → say there is no saved plan for that week. Do not run `Q_week_events`. Do not invent rest or results. Stop.
+2. Run `Q_week_events` (`:period_start` / `:period_end` from that row), `Q_habits`, `Q_queued_next_week`.
+3. Match `content.days[].sessions[].id` to `payload.session_id`. Current value unchanged: latest `exercise_logged` per date + `exercise_key`; latest `activity_logged` per date + `activity_key` + `instance` (missing `instance` = 1). Latest `session_completed` or `session_missed` per `session_id` wins.
+4. Speak a compact Swedish card. Mid-week: label **hittills** / **kvar**. Three visible layers:
+   - **Fakta** — planned sessions against events
+   - **Okänt** — planned, date < today, neither complete nor miss nor log
+   - **Slutsats** — labelled as slutsats (e.g. extra lower body + quality running). Do not write it to `user_profiles.data`.
+5. Per planned session:
+
+| Signal | Show as |
+| --- | --- |
+| `session_completed` | gjort (`partial` if `status` says so) |
+| `session_missed` | hoppat över |
+| logs with `session_id` but no complete/miss | logg |
+| none, date ≥ today | kvar |
+| none, date < today | oklart — not auto-missed |
+| `exercise_logged` with `session_id` null | extra gym |
+| `activity_logged` with `session_id` | schemalagd vana gjord |
+| `activity_logged` without `session_id` | utanför schema (gåband/yoga/övrigt) |
+
+Days with `sessions: []` are rest, not oklart. Do not treat a missing background walk as `session_missed`. Habits: observation only (N current bouts against the `Q_habits` pattern). If habit catch-up in `activity-load.md` applies (quiet week), ask once with their habit names, then continue — not during a mid-set gym log, not as this card.
+
+Do not show: PR, kcal, invented kg.
+
+If `Q_queued_next_week` exists: say next week is already saved. Changing it is the existing minor/major + supersede path in `training-plan`, not a silent overwrite.
+
+CTA: `Vill du att jag lägger nästa vecka utifrån det här?` Do not auto-draft. `Ja` → load `training-plan` (draft as **Förslag (sparas inte än)**).
+
+Write nothing: no events, no `plans` UPDATE, no `recommendations`, no `user_profiles`.
+
+If the same message also asks to draft next week: this section first, then `training-plan`.
+
 ## Dialogue
 
-Match intent. Keep replies short during a workout. Do not assume gåband or yoga happened unless they just logged it. Shortcut session fill waits for one `godkänn`; a single exercise line does not.
+Match intent. Keep replies short during a workout. Do not assume gåband or yoga happened unless they just logged it. Shortcut session fill waits for one `godkänn`; a single exercise line does not. A weekly overview is a spoken card, not a write.

@@ -294,6 +294,43 @@ Start over or use a throwaway project. Answer that you get chest pain when exert
 
 Expected: Swedish advice to seek care; `safety_status = stop` only after you approve that screening summary; no plan is created even if you ask for one.
 
+### G. Weekly overview then next-week draft
+
+Prerequisite: a covering week with at least one `session_completed`, one `session_missed`, and e.g. gåband (`activity_logged`). New chat per prompt. Speak Swedish.
+
+Count first (repeat after step 1; counts must not change until `godkänn` in step 2):
+
+```sql
+select type, count(*)
+from events
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+group by type
+order by type;
+
+select id, status, period_start, period_end
+from plans
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+order by created_at;
+
+select count(*) as recommendations_count
+from recommendations
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
+```
+
+1. Prompt: `Hur gick veckan?`
+
+Expected: a Swedish card, not D2’s show-saved-session fast path (not only today’s **Sparat pass**). Week dates = the covering plan’s `period_start`–`period_end` (not a guessed Monday). Gjort / hoppat över / oklart / kvar match the SQL. Habits as a count against the pattern, not as `session_missed`. No PR unless you asked. Event / plan / `recommendations` counts unchanged. No new `week_reviewed` (that type does not exist).
+
+2. Then: `Ja, lägg nästa vecka` without `godkänn`.
+
+Expected: **Förslag (sparas inte än)**; `plans` unchanged. The draft includes one line **denna vecka i korthet**. Suggested kg follow existing **Förslag vikt** (`loads-and-prs.md`), not a new progression rule.
+
+After `godkänn`: if that Monday is **after today**, a new `proposed` row; current week still `active`; `plan_proposed` only for the new id (no `plan_activated`). If a `proposed` week already existed for that Monday, that old row is `superseded`.
+
+3. Mid-week (today is not Sunday): remaining days of the covering week are **kvar**, not hoppat över / missade.
+
+4. With no covering plan for today (or a named week with no row): `ingen sparad plan` (or equivalent). No invented overview. No events written.
+
 ## 5. What you cannot verify from this repo alone
 
 The ChatGPT conversation itself has to be run in your account after GitHub and Supabase are connected. The SQL above is the source of truth for whether the vertical works.

@@ -157,6 +157,22 @@ order by occurred_at desc;
 
 ---
 
+### Q_week_events
+
+Logs in the covering week. Weekly overview and the one-line “denna vecka i korthet” when drafting. `:period_start` / `:period_end` come from `Q_covering_plan`, never guessed. Skip this query if there is no covering row.
+
+```sql
+select type, plan_id, payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type in ('exercise_logged', 'session_completed', 'session_missed', 'activity_logged')
+  and (payload->>'date') >= :period_start
+  and (payload->>'date') <= :period_end
+order by payload->>'date', occurred_at desc;
+```
+
+---
+
 ### Q_habit_last_dates
 
 Last logged date per habit. Habit catch-up when drafting or wrapping the day — not during a mid-set gym log.

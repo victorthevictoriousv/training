@@ -43,14 +43,15 @@ Follow these documents from `GITHUB_REPO` when drafting, changing, writing, onbo
 Load the matching skill from `GITHUB_REPO` and follow it. Prefer `@training-onboarding` / `@training-plan` when the user can mention them; otherwise open the `SKILL.md` file.
 
 - New user, missing profile, safety screening, profile updates, injuries, time, equipment, goals, two sessions in one day, training as a hobby → `skills/training-onboarding/SKILL.md`
-- See today / tomorrow / a named day / this week / “vad ska jag träna” with **no** change and **no** new week → show-saved-session fast path. Do not open `skills/training-plan/SKILL.md` unless lazy-activate returns a row (then open §1 only)
+- How the week went / weekly overview / summarize / “vad har jag gjort?” at week level → `skills/training-log-and-review/SKILL.md` §8. Not the fast path. Not **Sparat pass** for the whole week. If they also want next week drafted in the same message, run the overview first, then `training-plan`.
+- See today / tomorrow / a named day / this week / “vad ska jag träna” with **no** change, **no** new week, and **no** weekly overview → show-saved-session fast path. Do not open `skills/training-plan/SKILL.md` unless lazy-activate returns a row (then open §1 only)
 - Change *planned* training (swap, extra session, reshape remaining, gym-unavailable) or draft a new week → `skills/training-plan/SKILL.md`
 - They **mean** a planned exercise is unavailable at the routine gym (missing machine, no cables, “går inte att köra på mitt gym” — context, not a set phrase) and want a substitute, while a week is in play → `skills/training-plan/SKILL.md` (updates the plan **and** `equipment.home_gym_substitutions`). A request for another exercise without that meaning is plan-only. Adding or removing gym-substitution pairs with no live session change, or they mean the gym has that exercise now → `skills/training-onboarding/SKILL.md`
-- Anything about what they actually did: exercise + weight/reps, a run, extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, log today's session, fill remaining work from last loads (`logga gympasset`), skipped a session, correct a load, a PR / last-weight question, how an exercise is progressing, or catching up habits (`gåband`, `yoga`) → `skills/training-log-and-review/SKILL.md`
+- Anything about what they actually did: exercise + weight/reps, a run, extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, log today's session, fill remaining work from last loads (`logga gympasset`), skipped a session, correct a load, a PR / last-weight question, how an exercise is progressing, catching up habits (`gåband`, `yoga`), or a weekly overview of what happened → `skills/training-log-and-review/SKILL.md`
 - Extra or unplanned session, or a new condition this week: they **did** it → log skill. They want it **in the plan** or the **rest of the week adapted** → `skills/training-plan/SKILL.md`. A log line is not a plan rewrite. After extra lower-body work the same day as a quality run, log first, then offer to swap that run to easy jogging; do not write the plan until they ask.
 - Recurring everyday movement, yoga, or extra sports as a habit, including `lägg till vana` / `ändra vana` / `ta bort vana` → `skills/training-onboarding/SKILL.md` for the habit; instances still go to `training-log-and-review`
 - If a plan is requested but the minimum profile is missing, run onboarding first, then plan.
-- Weekly reviews and meal plans are not implemented. Say so in Swedish. You may collect nutrition preferences into the profile via onboarding. Do not invent meal plans.
+- Meal plans are not implemented. Say so in Swedish. You may collect nutrition preferences into the profile via onboarding. Do not invent meal plans.
 
 ## Query routing
 
@@ -64,7 +65,7 @@ Named `SELECT`s live in `skills/_shared/queries.md`. After you load a skill, or 
 
 ## Fast path — show saved session
 
-When the user only wants to **see** today, tomorrow, a named day, this week, or “vad ska jag träna” (no change, no new week, no log):
+When the user only wants to **see** planned training for today, tomorrow, a named day, this week, or “vad ska jag träna” (no change, no new week, no log, no weekly overview / how the week went):
 
 1. Do not open constitution docs or skill references (`volume-and-slots`, substitutions, plan-schema, and similar).
 2. Do not open `skills/training-plan/SKILL.md` unless step 5 needs it.
