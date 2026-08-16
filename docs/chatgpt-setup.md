@@ -16,16 +16,26 @@ where conrelid = 'events'::regclass
 
 Expected: the definition includes `activity_logged`.
 
-3. [`0004_plan_active_uniqueness.sql`](../supabase/migrations/0004_plan_active_uniqueness.sql) has been applied. Confirm the index exists:
+3. [`0004_plan_active_uniqueness.sql`](../supabase/migrations/0004_plan_active_uniqueness.sql) and [`0005_invariants.sql`](../supabase/migrations/0005_invariants.sql) have been applied. Confirm:
 
 ```sql
-select indexdef
+select indexname
 from pg_indexes
 where tablename = 'plans'
-  and indexname = 'plans_one_active_per_user';
+  and indexname in ('plans_one_active_per_user', 'plans_one_proposed_per_user_period');
+
+select conname
+from pg_constraint
+where conrelid = 'plans'::regclass
+  and conname in ('plans_iso_week_chk', 'plans_no_overlap_active_proposed');
+
+select tgname
+from pg_trigger
+where tgrelid = 'events'::regclass
+  and tgname = 'events_append_only';
 ```
 
-Expected: one row, `where (status = 'active'::text)` in the definition.
+Expected: both indexes, both constraints, and the append-only trigger.
 
 4. Confirm the four tables still exist:
 
@@ -270,6 +280,30 @@ Expected: current week still `active`; next week is `proposed` (not `active`). `
 
 Then ask about a remaining day of the current week (e.g. `har jag något löppass imorgon?` when tomorrow is still in this ISO week). Expected: **Sparat pass** from the current week’s `content`, not “ingen plan” / rest just because next week is saved.
 
+### D7. Förslag vikt uses a two-session streak
+
+After D (a covering week exists) and at least two `exercise_logged` rows for one compound lift, on **different dates**, same `load_kg`, every working set at or above the planned low end, RPE missing or ≤ 7.5.
+
+New chat: `Lägg en veckoplan för nästa vecka.` Do not `godkänn` yet.
+
+Expected: that lift is labelled **Förslag vikt** at last working + 2.5 kg (isolation: +1.25 or hold). A lift with only **one** successful current log at that kg stays at last working (no bump). `Vad är dagens pass?` and `logga gympasset` still cue / copy last working with no bump.
+
+Without `godkänn`: `plans.content` unchanged. After `godkänn`: `item.load` on the bumped lift matches the proposal.
+
+If the latest log for that key missed reps or has RPE ≥ 9: hold or −2.5, not +2.5.
+
+### D8. PR ignores a corrected load
+
+After an `exercise_logged` for a key at a high kg, send a correction (`nej, [lower] kg` or `[lift] [lower]`). Then: `Vad är mitt PR i [lift]?`
+
+Expected: PR is the corrected (current) kg, not the superseded row. `Q_pr` must not change if you only `UPDATE` an event (that write must fail: events are append-only).
+
+### D9. Profile merge does not wipe
+
+After a complete profile exists, `lägg till vana` (or change one field) then `godkänn`.
+
+Expected: new habit (or field) is in `data`; `goals`, `availability`, `equipment`, and unrelated keys are still present. No `data = :data` replace of the whole document.
+
 ### E. End-to-end provenance
 
 ```sql
@@ -319,11 +353,11 @@ where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
 
 1. Prompt: `Hur gick veckan?`
 
-Expected: a Swedish card, not D2’s show-saved-session fast path (not only today’s **Sparat pass**). Week dates = the covering plan’s `period_start`–`period_end` (not a guessed Monday). Gjort / hoppat över / oklart / kvar match the SQL. Habits as a count against the pattern, not as `session_missed`. No PR unless you asked. Event / plan / `recommendations` counts unchanged. No new `week_reviewed` (that type does not exist).
+Expected: a Swedish card, not D2’s show-saved-session fast path (not only today’s **Sparat pass**). Week dates = the covering plan’s `period_start`–`period_end` (not a guessed Monday). On **Monday**, a bare `Hur gick veckan?` is the week that just ended (lookup date = yesterday), not the new empty week. Gjort / hoppat över / oklart / kvar match the SQL. Habits as a count against the pattern, not as `session_missed`. No PR unless you asked. Event / plan / `recommendations` counts unchanged. No new `week_reviewed` (that type does not exist).
 
 2. Then: `Ja, lägg nästa vecka` without `godkänn`.
 
-Expected: **Förslag (sparas inte än)**; `plans` unchanged. The draft includes one line **denna vecka i korthet**. Suggested kg follow existing **Förslag vikt** (`loads-and-prs.md`), not a new progression rule.
+Expected: **Förslag (sparas inte än)**; `plans` unchanged. The draft includes one line **denna vecka i korthet**. Suggested kg follow **Förslag vikt** in `loads-and-prs.md` (two successful current logs at the same kg, not a single last log). Not a second progression rule.
 
 After `godkänn`: if that Monday is **after today**, a new `proposed` row; current week still `active`; `plan_proposed` only for the new id (no `plan_activated`). If a `proposed` week already existed for that Monday, that old row is `superseded`.
 

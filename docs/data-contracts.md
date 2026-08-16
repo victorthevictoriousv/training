@@ -12,7 +12,7 @@ Language: English identifiers. User-visible strings stored in JSON (titles, inte
 - `user_profiles.data` stores only `confirmed` fields.
 - Observations belong in `events` with `source_status = observation`.
 - AI conclusions belong in `events` with `source = ai` and `source_status = inference`, or later in `recommendations.rationale`.
-- `events` is append-only. Corrections are new rows, never UPDATE or DELETE.
+- `events` is append-only. Corrections are new rows, never UPDATE or DELETE. The database rejects UPDATE/DELETE on `events`.
 - After the initial schema is applied, ChatGPT must not run DDL. Schema changes belong in new migration files.
 - RLS is enabled with no `anon`/`authenticated` policies. The Data API is denied. ChatGPT uses a privileged connection.
 
@@ -54,7 +54,7 @@ One row per user. `user_id` is unique.
 | `activated_at` | `timestamptz` | Set when status becomes `active` |
 | `archived_at` | `timestamptz` | |
 
-The database refuses a second `active` plan per user (`plans_one_active_per_user`: unique on `user_id` where `status = 'active'`). Skills must still keep **at most one `proposed` future week** — that half is not a DB constraint, because “future” depends on `current_date`.
+The database refuses a second `active` plan per user (`plans_one_active_per_user`). It also refuses a second `proposed` row for the same `period_start` (`plans_one_proposed_per_user_period`), overlapping `active`/`proposed` periods (`plans_no_overlap_active_proposed`), and non-ISO weeks (`plans_iso_week_chk`: Monday–Sunday). Skills must still lazy-activate on Monday rather than activating a future week at save time.
 
 Lookup is by **date**, not by the `active` row alone: the covering plan is the row whose `period_start`–`period_end` contains the date, preferring `active`, then `proposed`, then `completed`, then `superseded`. A still-running week must stay visible after the next week is saved.
 
@@ -92,7 +92,7 @@ Event types:
 - `session_missed`
 - `activity_logged`
 
-Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` for that key. Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Do not UPDATE earlier rows. Do not store PRs in a separate table. Do not mix `activity_logged` into exercise PR or last-load queries.
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` across **current** logs for that key (latest row per date; a correction replaces that date). Running PR is max `distance_km` / `duration_min` and fastest pace on current logs (`Q_run_pr`). Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Do not UPDATE earlier rows. Do not store PRs in a separate table. Do not mix `activity_logged` into exercise PR or last-load queries.
 
 ### `recommendations`
 

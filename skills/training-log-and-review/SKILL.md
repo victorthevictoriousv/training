@@ -30,10 +30,10 @@ Classify once (meaning, not a phrase list). Run only those ids from `skills/_sha
 | `logga gympasset` / `klarade alla övningar` | §4B | `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr` |
 | `resten enligt plan` | §4C | `Q_covering_plan`, `Q_today_logs` | Copy last working into `exercise_logged` |
 | Skipped a session | §5 | `Q_covering_plan` | Last working, PR |
-| “Vad är mitt PR?” / personbästa | §6 | `Q_pr` | Covering-plan writes, last working as the answer |
+| “Vad är mitt PR?” / personbästa | §6 | `Q_pr`; add `Q_run_pr` if they asked a run / 10 km / pace / tid | Covering-plan writes, last working as the answer |
 | “Hur går bänken?” / utveckling | §6 | `Q_recent_results` | PR as a headline, plan writes |
 | Last weight / lägg på X kg (asked) | §6 | `Q_last_working` | `Q_pr` unless they also asked PR |
-| Week overview (“hur gick veckan”, sammanfatta, “vad har jag gjort?” på veckonivå) | §8 | `Q_covering_plan`, `Q_week_events`, `Q_habits`, `Q_queued_next_week` | `Q_pr`, `Q_recent_results`, `Q_lazy_activate_candidate`, `Q_last_working`, `Q_today_logs` / `Q_today_activity` (not ×7), `Q_activity_lookback`, `Q_habit_last_dates` |
+| Week overview (“hur gick veckan”, sammanfatta, “vad har jag gjort?” på veckonivå) | §8 | `Q_covering_plan`, `Q_week_events`, `Q_habits`, `Q_queued_next_week` | `Q_pr`, `Q_run_pr`, `Q_recent_results`, `Q_lazy_activate_candidate`, `Q_last_working`, `Q_today_logs` / `Q_today_activity` (not ×7), `Q_activity_lookback`, `Q_habit_last_dates` |
 
 ## Before you start
 
@@ -199,7 +199,7 @@ Clear skip (`hoppade över`, `kunde inte träna idag`): insert `session_missed`,
 
 ### 6. PR, last weight, or results (only when asked)
 
-If they ask for a PR, last weight, how an exercise is going, or similar: run `Q_pr`, `Q_last_working`, or `Q_recent_results` as the intent table says. Rules in `references/loads-and-prs.md`. Answer that exercise (or a short list if they asked generally). Do not volunteer PRs or full histories on ordinary logs or “dagens pass”.
+If they ask for a PR, last weight, how an exercise is going, or similar: run `Q_pr`, `Q_run_pr`, `Q_last_working`, or `Q_recent_results` as the intent table says. Rules in `references/loads-and-prs.md`. Answer that exercise (or a short list if they asked generally). Do not volunteer PRs or full histories on ordinary logs or “dagens pass”.
 
 ### 7. After a write
 
@@ -211,9 +211,9 @@ If you just logged extra lower-body strength (unmatched to today's plan, or they
 
 How the covering week went. Read and tell. Do not write. Mid-set gym logs, `logga gympasset`, and one day’s **Sparat pass** are not this intent.
 
-Do not open `references/loads-and-prs.md`. Do not run `Q_pr` or `Q_last_working`. Do not lazy-activate. Do not run `Q_today_logs` / `Q_today_activity` for each day of the week.
+Do not open `references/loads-and-prs.md`. Do not run `Q_pr`, `Q_run_pr`, or `Q_last_working`. Do not lazy-activate. Do not run `Q_today_logs` / `Q_today_activity` for each day of the week.
 
-`:date` = today in `Europe/Stockholm` unless they named last week or a date. If they named a week, use a day in that week only as the `Q_covering_plan` lookup; the event window is that row’s `period_start`–`period_end`, never a guessed Monday.
+`:date` = today in `Europe/Stockholm` unless they named last week or a date. **Bare “hur gick veckan” on Monday:** use yesterday (Sunday of the week that just ended) as the `Q_covering_plan` lookup — not today, which would be the new empty week. If they clearly mean this week so far (`hittills`, `den här veckan`), use today. If they named a week, use a day in that week only as the `Q_covering_plan` lookup; the event window is that row’s `period_start`–`period_end`, never a guessed Monday.
 
 1. Run `Q_covering_plan`. No row → say there is no saved plan for that week. Do not run `Q_week_events`. Do not invent rest or results. Stop.
 2. Run `Q_week_events` (`:period_start` / `:period_end` from that row), `Q_habits`, `Q_queued_next_week`.

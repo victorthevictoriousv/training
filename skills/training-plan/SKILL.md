@@ -23,9 +23,9 @@ Classify once (meaning, not a phrase list). Run only those ids from `skills/_sha
 
 | User means | Section | Queries | Skip |
 | --- | --- | --- | --- |
-| Today / tomorrow / a named day / “vad ska jag träna” | §4 | `Q_lazy_activate_candidate` (apply §1 writes if a row), `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr`, `Q_activity_lookback`, week INSERT |
-| This week / the weekly plan | §4 | Same as a day, plus `Q_queued_next_week` | `Q_pr` |
-| Draft or approve a new week | §2–3, §5 | `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_last_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events` | `Q_pr`. Future week: do not activate |
+| Today / tomorrow / a named day / “vad ska jag träna” | §4 | `Q_lazy_activate_candidate` (apply §1 writes if a row), `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr`, `Q_run_pr`, `Q_activity_lookback`, week INSERT |
+| This week / the weekly plan | §4 | Same as a day, plus `Q_queued_next_week` | `Q_pr`, `Q_run_pr` |
+| Draft or approve a new week | §2–3, §5 | `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_recent_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events` | `Q_pr`, `Q_run_pr`, `Q_last_working`. Future week: do not activate |
 | Swap, gym-unavailable, extra session, reshape remaining | §4 | `Q_covering_plan`, then draft; writes after `godkänn` | Log `INSERT`, `Q_pr` |
 | They already did the work | hand off `training-log-and-review` | — | Plan UPDATE until they ask |
 | PR / last weight / “hur går det” | hand off log skill | — | All plan writes |
@@ -67,7 +67,7 @@ Today = current date in `Europe/Stockholm`. Session lookup is by **date**, not b
 1. Set any `active` plan whose `period_end < today` to `completed` and `archived_at = now()`. That week ended; do not `superseded`.
 2. Set that `proposed` row to `active`, `activated_at = now()`, insert `plan_activated`.
 
-If `Q_lazy_activate_candidate` returns a row, complete the expired active week (if any), then activate:
+If `Q_lazy_activate_candidate` returns a row, complete the expired active week (if any), then activate. Run both `UPDATE`s then the `INSERT` in **one** SQL call, in this order. The second `UPDATE` no-ops (0 rows) when another plan is still `active` — do not insert `plan_activated` then; present `Q_covering_plan` as usual. Do not supersede a still-running week to force the activate.
 
 ```sql
 update plans
@@ -80,19 +80,30 @@ update plans
 set status = 'active', activated_at = now()
 where id = :proposed_plan_id
   and user_id = :USER_ID
-  and status = 'proposed';
+  and status = 'proposed'
+  and not exists (
+    select 1 from plans
+    where user_id = :USER_ID
+      and status = 'active'
+      and id <> :proposed_plan_id
+  );
 
 insert into events (user_id, type, source, source_status, plan_id, payload)
-values (
+select
   :USER_ID, 'plan_activated', 'user', 'confirmed', :proposed_plan_id, :payload::jsonb
+where exists (
+  select 1 from plans
+  where id = :proposed_plan_id
+    and user_id = :USER_ID
+    and status = 'active'
 );
 ```
 
 Do not lazy-activate during `training-log-and-review` (that skill must not `UPDATE plans`). `Q_covering_plan` is enough for logs.
 
-Then run the remaining ids from the intent table (`Q_profile`, `Q_covering_plan`, `Q_queued_next_week`, `Q_last_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events` as listed). `:date` is today unless the user named a day.
+Then run the remaining ids from the intent table (`Q_profile`, `Q_covering_plan`, `Q_queued_next_week`, `Q_recent_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events` as listed). `:date` is today unless the user named a day.
 
-`:lookback_date` is the Monday of the week before the covering plan’s week (or the week being drafted). `:period_end` is that plan’s `period_end`. For `Q_week_events`, `:period_start` / `:period_end` are the **current** covering plan’s dates (today), not the week being drafted. Skip `Q_week_events` if there is no covering row. Use `data.lifestyle.habits` from the profile row (may be absent). Use last working loads when drafting or showing sessions (`Q_last_working` plus `skills/training-log-and-review/references/loads-and-prs.md`). Do not print PRs unless asked. Apply `references/activity-load.md` when drafting: pattern vs instance, and habit catch-up if no matching `activity_logged` in the last 7 days.
+`:lookback_date` is the Monday of the week before the covering plan’s week (or the week being drafted). `:period_end` is that plan’s `period_end`. For `Q_week_events`, `:period_start` / `:period_end` are the **current** covering plan’s dates (today), not the week being drafted. Skip `Q_week_events` if there is no covering row. Use `data.lifestyle.habits` from the profile row (may be absent). When showing a session, use last working from `Q_last_working`. When drafting, use `Q_recent_working` plus `skills/training-log-and-review/references/loads-and-prs.md` (streak → **Förslag vikt**); last working is the first row per key (`Q_recent_working` is already current-per-date). Do not print PRs unless asked. Apply `references/activity-load.md` when drafting: pattern vs instance, and habit catch-up if no matching `activity_logged` in the last 7 days.
 
 If no profile row, or any minimum field from `skills/training-onboarding/references/profile-fields.md` is missing, switch to `training-onboarding`. Do not draft a full week from guesses.
 
@@ -125,7 +136,7 @@ Programming rules (v1, not a periodization engine). Follow `references/volume-an
 - Scale volume/complexity to `experience.*`. If experience is missing and `training_age_years` ≥ 5, program intermediate volume (inference, not a profile write). Do not use a beginner template
 - Recovery is a hard gate: most sessions easy; at most one hard quality run per week; at least one day with no gym and no run if `recovery` is selected or days per week ≥ 4. If a background walk or yoga habit exists, do not add extra walk/mobility sessions; that day may still be empty of gym/run
 - If only one modality was selected, the whole week may be that modality plus rest days
-- Strength: compound lifts first, named sets/reps/RPE. Fill suggested kg from last working loads per `loads-and-prs.md`. Working sets around RPE 7, not failure
+- Strength: compound lifts first, named sets/reps/RPE. Fill suggested kg from `Q_recent_working` per `loads-and-prs.md` (two successful current logs at the same kg, not a single last log). Working sets around RPE 7, not failure
 - Running: easy / quality / long as fits experience and `volume-and-slots.md`; use last duration/distance, not running PRs, as the default target. No quality run after heavy lower body the same day
 - Mobility: short named drills with minutes, unless a background yoga/mobility habit already covers it
 - Recovery: explicit rest or easy work, not hidden intensity
@@ -134,7 +145,7 @@ Programming rules (v1, not a periodization engine). Follow `references/volume-an
 - Unplanned `activity_logged` of `kind` extra in the lookback window: same load caution, still not a new session unless they ask to schedule it.
 - Do not store kcal in the plan. If two sessions land the same day, one fueling line as inference is allowed; do not save it.
 
-Show the week in Swedish as **Förslag (sparas inte än)**. When an item has `preferred`, show **Förstahand (annat gym)** on that line. Label inferences separately. After the week draft, add one Swedish line **denna vecka i korthet** from `Q_week_events` (facts only, not the log skill’s full card). Skip the line if `Q_week_events` was not run. Suggested kg still come from last working per `loads-and-prs.md`. Do not invent a second progression rule. If habit catch-up applies (`activity-load.md`), ask with their habit names in the same turn as the draft — do not assume the vanor were done. Wait for `godkänn` / `ja` / `spara` on the week. Habit instances they report go to `training-log-and-review` without a second `godkänn`.
+Show the week in Swedish as **Förslag (sparas inte än)**. When an item has `preferred`, show **Förstahand (annat gym)** on that line. Label inferences separately. After the week draft, add one Swedish line **denna vecka i korthet** from `Q_week_events` (facts only, not the log skill’s full card). Skip the line if `Q_week_events` was not run. Suggested kg come from `Q_recent_working` per `loads-and-prs.md` (streak). Do not invent a second progression rule. If habit catch-up applies (`activity-load.md`), ask with their habit names in the same turn as the draft — do not assume the vanor were done. Wait for `godkänn` / `ja` / `spara` on the week. Habit instances they report go to `training-log-and-review` without a second `godkänn`.
 
 If they request a change to a saved plan, follow "Present or change a saved session" or the major-replacement write. Never treat a newly generated session as the saved plan.
 
@@ -235,7 +246,7 @@ If `data.equipment` is missing `home_gym_substitutions`, `jsonb_set` still creat
 
 ### 5. Write after approval (new or replacement week)
 
-Keep at most one `active` plan (the database rejects a second). At most one `proposed` future week. Chat drafts stay in the conversation until `godkänn`; a `proposed` **row** after approval is the saved next week, not a draft.
+Keep at most one `active` plan (the database rejects a second). At most one `proposed` row per `period_start` (replacing a queued week: supersede that row first). `active` and `proposed` periods must not overlap. Chat drafts stay in the conversation until `godkänn`; a `proposed` **row** after approval is the saved next week, not a draft.
 
 Today = current date in `Europe/Stockholm`. Allocate `new_plan_id` with `gen_random_uuid()` first. `version` is `1` for the first plan, otherwise previous `version + 1`. `payload` follows `docs/data-contracts.md`.
 

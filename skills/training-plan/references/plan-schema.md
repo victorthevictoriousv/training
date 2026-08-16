@@ -107,5 +107,5 @@ Scheduled habit session:
 
 - `title`: short Swedish, e.g. `Vecka 33 — styrka och löpning`
 - `intent`: one or two Swedish sentences on what the week is for
-- `status` after the approval write: `active`
-- `period_start` / `period_end`: Monday and Sunday
+- `status` after the approval write: `active` for a same-week replacement (`period_start` ≤ today). `proposed` for a future week (`period_start` after today) — do not activate until that Monday (lazy activate)
+- `period_start` / `period_end`: Monday and Sunday of the same ISO week (the database rejects other ranges)

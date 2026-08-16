@@ -45,7 +45,7 @@ Inference (do not save as profile fact):
 | Replacing an active plan (same week) | `plan_superseded` on the old plan, then proposed + activated on the new |
 | Future week after approval (`period_start` after today) | `plan_proposed` only; current `active` week stays. Activate later via lazy activate |
 | Replacing a queued future `proposed` week | `plan_superseded` on that proposed row, then `plan_proposed` on the new (still not `active`) |
-| Exercise log or weight correction | `exercise_logged` (append; latest wins) |
+| Exercise log or weight correction | `exercise_logged` (append; latest wins; PR uses current rows only) |
 | Extra-plan activity or a correction of it | `activity_logged` (append; latest per date + `activity_key` + `instance` wins; new bout vs correction per log-schema) |
 | Finished or skipped session | `session_completed` or `session_missed` |
 

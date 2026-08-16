@@ -44,6 +44,7 @@ supabase/migrations/   Versioned Postgres schema
 | [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) | Initial schema |
 | [supabase/migrations/0003_activity_logged.sql](supabase/migrations/0003_activity_logged.sql) | `activity_logged` event type |
 | [supabase/migrations/0004_plan_active_uniqueness.sql](supabase/migrations/0004_plan_active_uniqueness.sql) | DB-level guard: at most one `active` plan per user |
+| [supabase/migrations/0005_invariants.sql](supabase/migrations/0005_invariants.sql) | Append-only `events`; ISO week; one `proposed` per period; no overlapping `active`/`proposed` |
 
 ## Language
 

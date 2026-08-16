@@ -14,6 +14,7 @@ Collect profile data, run a safety screen, and write confirmed facts only after 
 - Invent meal plans, session logs, or `activity_logged` rows (instances belong in `training-log-and-review`)
 - Diagnose, or advise on medication
 - Write `user_profiles.data` before the user approves the summary
+- Replace all of `user_profiles.data` on a later save (`data = :data` drops unrelated keys)
 - Store AI conclusions, kcal, MET, or TDEE as profile facts
 
 ## Intent
@@ -139,7 +140,7 @@ Then insert `user_profiles` with:
 
 **Later save (row exists):**
 
-Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits` and `equipment.home_gym_substitutions`, write the full confirmed array (add, change, or remove items they approved).
+Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never `data = :data` — that drops unrelated keys. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits` and `equipment.home_gym_substitutions`, write the full confirmed array (add, change, or remove items they approved).
 
 Do not UPDATE `events`.
 
@@ -178,6 +179,35 @@ insert into user_profiles (
   :provenance::jsonb
 );
 ```
+
+Later save (row exists): insert `profile_updated` first (`returning id`), then merge. Never `set data = :data`. If `lifestyle` is missing, the nested `jsonb_set` below creates it.
+
+```sql
+update user_profiles
+set
+  data = jsonb_set(
+    jsonb_set(
+      data,
+      '{lifestyle}',
+      coalesce(data->'lifestyle', '{}'::jsonb)
+    ),
+    '{lifestyle,habits}',
+    :habits::jsonb
+  ),
+  provenance = jsonb_set(
+    provenance,
+    '{lifestyle.habits}',
+    jsonb_build_object(
+      'source', 'user',
+      'status', 'confirmed',
+      'confirmed_at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'event_id', :event_id
+    )
+  )
+where user_id = :USER_ID;
+```
+
+A single top-level key (example `modalities`): `data = jsonb_set(data, '{modalities}', :modalities::jsonb)`. Same `jsonb_set` pattern as `equipment.home_gym_substitutions` in `training-plan`. If the substitutions array would be empty, `data = data #- '{equipment,home_gym_substitutions}'` and drop that provenance key — do not save `[]`.
 
 ## Dialogue
 

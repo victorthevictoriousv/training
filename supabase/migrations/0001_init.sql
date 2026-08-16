@@ -121,6 +121,5 @@ create index recommendations_user_id_status_idx on recommendations (user_id, sta
 comment on table recommendations is
   'Proposed changes that need approval. Unused by the first vertical; rationale is AI inference, never a confirmed fact.';
 
--- RLS is intentionally not enabled in v1. user_id is present so policies
--- can be added when a real client and auth exist.
--- ChatGPT's official Supabase app is privileged; RLS would not constrain it.
+-- RLS is enabled in 0002 with no anon/authenticated policies (Data API denied).
+-- ChatGPT's official app uses a privileged connection and still bypasses RLS.

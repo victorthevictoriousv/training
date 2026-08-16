@@ -98,7 +98,7 @@ limit 1;
 
 ### Q_last_working
 
-Latest `exercise_logged` per `exercise_key` by logged date, then insert time. Showing a session, drafting a week, `logga gympasset`. Not for a single-set log. Not the answer to a PR question.
+Latest `exercise_logged` per `exercise_key` by logged date, then insert time. Showing a session, `logga gympasset`. Not for drafting a week (`Q_recent_working`). Not for a single-set log. Not the answer to a PR question.
 
 ```sql
 select distinct on (payload->>'exercise_key')
@@ -106,6 +106,33 @@ select distinct on (payload->>'exercise_key')
 from events
 where user_id = :USER_ID
   and type = 'exercise_logged'
+order by payload->>'exercise_key', payload->>'date' desc, occurred_at desc;
+```
+
+---
+
+### Q_recent_working
+
+Last 8 **current** `exercise_logged` per `exercise_key` (latest row per date + key already collapsed). Drafting a week (Förslag vikt streak). Last working is the first row per key. Do not collapse again. Do not run `Q_recent_results` once per exercise.
+
+```sql
+select payload, occurred_at
+from (
+  select payload, occurred_at,
+         row_number() over (
+           partition by payload->>'exercise_key'
+           order by payload->>'date' desc, occurred_at desc
+         ) as rn
+  from (
+    select distinct on (payload->>'exercise_key', payload->>'date')
+      payload, occurred_at
+    from events
+    where user_id = :USER_ID
+      and type = 'exercise_logged'
+    order by payload->>'exercise_key', payload->>'date' desc, occurred_at desc
+  ) current_per_day
+) t
+where rn <= 8
 order by payload->>'exercise_key', payload->>'date' desc, occurred_at desc;
 ```
 
@@ -190,16 +217,69 @@ group by payload->>'habit_key';
 
 ### Q_pr
 
-Max numeric `load_kg` per exercise. Only when they ask for a PR. `[.]` is a literal dot (do not write `\\.`).
+Max numeric `load_kg` per exercise from **current** logs only (latest row per date + `exercise_key`). A correction does not keep the old kg as a PR. Only when they ask for a strength PR. `[.]` is a literal dot (do not write `\\.`). Running PRs: `Q_run_pr`.
 
 ```sql
-select payload->>'exercise_key' as exercise_key,
+select current_log.payload->>'exercise_key' as exercise_key,
        max((set_row->>'load_kg')::numeric) as pr_kg
-from events e
-cross join lateral jsonb_array_elements(e.payload->'sets') as set_row
-where e.user_id = :USER_ID
-  and e.type = 'exercise_logged'
-  and (set_row->>'load_kg') ~ '^[0-9]+([.][0-9]+)?$'
+from (
+  select distinct on (payload->>'exercise_key', payload->>'date')
+    payload
+  from events
+  where user_id = :USER_ID
+    and type = 'exercise_logged'
+  order by payload->>'exercise_key', payload->>'date', occurred_at desc
+) current_log
+cross join lateral jsonb_array_elements(current_log.payload->'sets') as set_row
+where (set_row->>'load_kg') ~ '^[0-9]+([.][0-9]+)?$'
+group by 1;
+```
+
+---
+
+### Q_run_pr
+
+Max distance / duration and fastest pace from **current** `exercise_logged` per date + key. Only when they ask for a running PR (10 km, tid, pace). Do not use `activity_logged`. `[.]` is a literal dot.
+
+```sql
+select
+  exercise_key,
+  max(distance_km) as pr_distance_km,
+  max(duration_min) as pr_duration_min,
+  min(pace_min_per_km) filter (where pace_min_per_km is not null) as pr_pace_min_per_km
+from (
+  select
+    current_log.payload->>'exercise_key' as exercise_key,
+    case
+      when (set_row->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
+      then (set_row->>'distance_km')::numeric
+    end as distance_km,
+    case
+      when (set_row->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
+      then (set_row->>'duration_min')::numeric
+    end as duration_min,
+    case
+      when (set_row->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
+       and (set_row->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
+       and (set_row->>'distance_km')::numeric > 0
+      then (set_row->>'duration_min')::numeric
+         / (set_row->>'distance_km')::numeric
+    end as pace_min_per_km
+  from (
+    select distinct on (payload->>'exercise_key', payload->>'date')
+      payload
+    from events
+    where user_id = :USER_ID
+      and type = 'exercise_logged'
+    order by payload->>'exercise_key', payload->>'date', occurred_at desc
+  ) current_log
+  cross join lateral jsonb_array_elements(current_log.payload->'sets') as set_row
+  where (set_row->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
+     or (
+       (set_row->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
+       and current_log.payload->>'exercise_key' ~ '(run|jog|lopp)'
+     )
+) t
 group by 1;
 ```
 

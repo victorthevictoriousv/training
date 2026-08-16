@@ -86,6 +86,8 @@ A confirmed habit on the profile is not an instance. Yoga and gåband count only
 
 Latest `exercise_logged` for (`user_id`, `date`, `exercise_key`) wins.
 
+PR is the max `load_kg` (or run distance/duration/pace) across those **current** rows, not across superseded corrections.
+
 Latest `activity_logged` for (`user_id`, `date`, `activity_key`, `instance`) wins. Treat missing `instance` as `1`. Older rows stay for history. Load for the day is the **sum** of current instances (e.g. two gåband bouts), not only the last row.
 
 Correction language (`nej, 40 min`, `rättelse`) writes a new row with the **same** `instance` as the latest bout. A second `gåband` the same day without that language is a new `instance`.
