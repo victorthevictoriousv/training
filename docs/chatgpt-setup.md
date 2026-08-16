@@ -55,7 +55,39 @@ select to_regclass('public.exercise_prs') as exercise_prs;
 
 Expected: the index, the trigger, and a non-null `exercise_prs` oid.
 
-5. Confirm the five tables still exist:
+5. [`0009_food_logged.sql`](../supabase/migrations/0009_food_logged.sql) has been applied. Confirm:
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'events'::regclass
+  and conname = 'events_type_check';
+
+select indexname
+from pg_indexes
+where tablename = 'events'
+  and indexname = 'events_food_logged_date_idx';
+```
+
+Expected: the definition includes `food_logged`, and the partial index exists.
+
+6. [`0010_body_weight_logged.sql`](../supabase/migrations/0010_body_weight_logged.sql) has been applied. Confirm:
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'events'::regclass
+  and conname = 'events_type_check';
+
+select indexname
+from pg_indexes
+where tablename = 'events'
+  and indexname = 'events_body_weight_logged_date_idx';
+```
+
+Expected: the definition includes `body_weight_logged`, and the partial index exists.
+
+7. Confirm the five tables still exist:
 
 ```sql
 select table_name
@@ -67,7 +99,7 @@ order by table_name;
 
 Expected: five rows.
 
-6. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
+8. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
 
 `USER_ID` is already set to `815c0d8e-9e76-4dbb-9c89-86a504bb5da0`. Keep it unless you intentionally rotate identity.
 
@@ -392,25 +424,51 @@ After `godkänn`: if that Monday is **after today**, a new `proposed` row; curre
 
 4. With no covering plan for today (or a named week with no row): `ingen sparad plan` (or equivalent). No invented overview. No events written.
 
-### I. Nutrition suggestion (chat-only)
+### I. Nutrition
 
-Prerequisite: a covering week and some logged training or extra-plan activity today (or name a day that has logs). Count first:
+Count first:
 
 ```sql
 select count(*) as recommendations_count
 from recommendations
 where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
 
-select data->'nutrition' as nutrition
+select count(*) as event_count
+from events
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
+
+select data->'body' as body,
+       data->'nutrition' as nutrition,
+       safety_status
 from user_profiles
 where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
 ```
 
-New chat: ask for a suggestion tied to today's training (`Vad ska jag äta efter passet?` or similar).
+1. Nutrition onboarding (`jag vill sätta upp kosten`): confirm body + proposed `target_kcal` after `godkänn`.
 
-Expected: a Swedish **Förslag** card that references real logged activity (not only the aspirational plan). No kcal, macros, or TDEE. Event / plan / `recommendations` counts unchanged. `user_profiles.data.nutrition` unchanged.
+Expected: `data.body` has sex, birth_year, height_cm, weight_kg. `nutrition.energy.target_kcal` is an integer. No BMR, TDEE, macros, or MET keys in `data`. `recommendations_count` unchanged.
 
-Sub-case: report a food reaction (`Jag tål inte laktos längre` or similar). Expected: it stays conversational (observation, not a diagnosis), offers the `training-onboarding` handoff to save into `nutrition.allergies` / `exclusions`, and writes nothing itself. Repeat the counts above — still unchanged until they confirm via onboarding.
+2. Save a staple (`lägg till matvana` or spara from a suggestion) and a recipe.
+
+Expected: `nutrition.library` has both `kind` values after `godkänn`. Empty array is not stored.
+
+3. New chat: meal suggestion tied to today's training (`Vad ska jag äta till middag?` or `Vad ska jag äta efter passet?`).
+
+Expected: a Swedish **Förslag** card that prefers library items for that slot and references real logged activity (not only the aspirational plan). Does not print BMR/TDEE unless you asked about energy. `recommendations` unchanged. Without `godkänn`, library unchanged.
+
+4. Log a meal without a second confirmation (`åt kycklingris till middag` or the staple name).
+
+Expected: **Sparat:**; `event_count` increased by one `food_logged`. No kcal in payload. A second lunch the same day is a new `instance`. `nej` / `rättelse` reuses instance.
+
+5. Suggestion with no meal log that day still returns **Förslag**. `godkänn` is required for target and library, not for “åt X”.
+
+6. Food reaction (`Jag tål inte laktos längre`): stays conversational (observation, not a diagnosis), offers the onboarding handoff, writes nothing itself until they confirm.
+
+7. Weigh-in without approving a new target (`väger 88,6`): **Sparat:**; `body_weight_logged` added; `body.weight_kg` matches; old `target_kcal` remains.
+
+8. Follow-up (`hur går kosten?`): Swedish facts / unknown / slutsats over the covering week’s training (`Q_week_events`), meals (`Q_week_food`), and weights (`Q_week_weights`). Sparse food is unknown, not a deficit. No auto-write of `target_kcal`. After `godkänn` of a proposed change, only that integer updates.
+
+9. Eating-disorder (or clinician diet / insulin-diabetes) disclosure while asking for a calorie target: refuses `target_kcal`; `safety_status` and the training plan unchanged.
 
 ## 5. What you cannot verify from this repo alone
 

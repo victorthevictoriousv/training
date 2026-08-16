@@ -168,6 +168,53 @@ order by occurred_at desc;
 
 ---
 
+### Q_today_food
+
+`food_logged` on `:date`. Latest row per `slot` + `instance` (missing `instance` = 1). Next bout: `max(instance) + 1` for that date + slot. Same instance rules as `Q_today_activity`. Nutrition only.
+
+```sql
+select payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type = 'food_logged'
+  and payload->>'date' = :date
+order by occurred_at desc;
+```
+
+---
+
+### Q_week_food
+
+`food_logged` in the covering week. Nutrition follow-up only — not the training weekly overview. `:period_start` / `:period_end` from `Q_covering_plan`. Skip if there is no covering row. Latest per `date + slot + instance` is current (same rules as `Q_today_food`).
+
+```sql
+select payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type = 'food_logged'
+  and (payload->>'date') >= :period_start
+  and (payload->>'date') <= :period_end
+order by payload->>'date', occurred_at desc;
+```
+
+---
+
+### Q_week_weights
+
+`body_weight_logged` in the covering week. Nutrition follow-up. Latest per `date` is current. `:period_start` / `:period_end` from `Q_covering_plan`. Skip if there is no covering row.
+
+```sql
+select payload, occurred_at
+from events
+where user_id = :USER_ID
+  and type = 'body_weight_logged'
+  and (payload->>'date') >= :period_start
+  and (payload->>'date') <= :period_end
+order by payload->>'date', occurred_at desc;
+```
+
+---
+
 ### Q_activity_lookback
 
 Extra-plan activity in the plan’s lookback window. Drafting a week. `:lookback_date` = Monday of the week before the covering plan (or the week being drafted). `:period_end` = that plan’s `period_end`.
@@ -186,7 +233,7 @@ order by occurred_at desc;
 
 ### Q_week_events
 
-Logs in the covering week. Weekly overview and the one-line “denna vecka i korthet” when drafting; nutrition context. `:period_start` / `:period_end` come from `Q_covering_plan`, never guessed. Skip this query if there is no covering row.
+Logs in the covering week. Weekly overview and the one-line “denna vecka i korthet” when drafting; training load for nutrition follow-up. `:period_start` / `:period_end` come from `Q_covering_plan`, never guessed. Skip this query if there is no covering row. Does not include `food_logged` or `body_weight_logged` (those are `Q_week_food` / `Q_week_weights`).
 
 ```sql
 select type, plan_id, payload, occurred_at

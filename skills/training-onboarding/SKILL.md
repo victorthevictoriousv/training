@@ -1,6 +1,6 @@
 ---
 name: training-onboarding
-description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, or give meal plans (that is training-nutrition).
+description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, they want to set up diet (jag vill sätta upp kosten), they mention body weight / height / calorie target, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, log meals (that is training-nutrition food_logged), or give meal suggestions (that is training-nutrition).
 ---
 
 # training-onboarding
@@ -11,11 +11,12 @@ Collect profile data, run a safety screen, and write confirmed facts only after 
 
 - Create or activate weekly plans (hand off to `training-plan`)
 - Swap or substitute a **planned** exercise on an active week, including when they mean the gym cannot provide it (hand off to `training-plan`; that skill writes `home_gym_substitutions`)
-- Invent meal plans, session logs, or `activity_logged` rows (instances belong in `training-log-and-review`)
+- Invent meal plans, session logs, `activity_logged` rows, or `food_logged` rows (meal instances belong in `training-nutrition`)
 - Diagnose, or advise on medication
 - Write `user_profiles.data` before the user approves the summary
 - Replace all of `user_profiles.data` on a later save (`data = :data` drops unrelated keys)
-- Store AI conclusions, kcal, MET, or TDEE as profile facts
+- Store AI conclusions, BMR, TDEE, macros, or MET as profile facts. `nutrition.energy.target_kcal` may be stored only after `godkänn`
+- Set `safety_status` from a nutrition disclosure (eating disorder, clinician-prescribed diet, insulin-treated diabetes). Those refuse a calorie-target write only; see `docs/safety.md`
 
 ## Intent
 
@@ -26,6 +27,7 @@ Classify once. Run only those ids from `skills/_shared/queries.md`. Writes stay 
 | New user, missing profile, safety screening, “jag vill börja” | §1–5 | `Q_profile` | Plans, logs, last working, PR |
 | Update a confirmed field (goals, time, equipment, injuries) | §1, then confirmation | `Q_profile` | Plan UPDATE, session logs |
 | `lägg till vana` / `ändra vana` / `ta bort vana` | §3b | `Q_profile` | Covering-plan writes, `activity_logged` |
+| Set up diet, body measures, calorie target, kitchen, change goal/allergies, `lägg till matvana` without a live suggestion | §3d | `Q_profile` | Meal suggestions, `food_logged` |
 | Add/remove gym-substitution pairs with no live session, or “nu har gymmet X” | confirmation then profile write | `Q_profile` | `training-plan` session UPDATE |
 | They want a week but minimum fields are missing | this skill first, then `training-plan` | `Q_profile` | Drafting a full week from guesses |
 
@@ -75,7 +77,7 @@ Ask 2–4 questions per turn. Prefer this order after screening:
 
 If they say training is a hobby or they like training a lot, put that in `goals.notes` as their words. Do not invent elite volume tolerance.
 
-When the minimum plan fields in `references/profile-fields.md` are ready, go to step 3b before the confirmation card. Sleep, stress, and nutrition stay optional. Habits are also optional to *save*, but the question in 3b is asked once. `windows`, `two_a_day`, and `anchor` are optional to save but should be asked in step 3 when those gaps exist.
+When the minimum plan fields in `references/profile-fields.md` are ready, go to step 3b before the confirmation card. Sleep, stress, and nutrition stay optional. Habits are also optional to *save*, but the question in 3b is asked once. `windows`, `two_a_day`, and `anchor` are optional to save but should be asked in step 3 when those gaps exist. Full nutrition onboarding (body, energy target, library) is §3d — do not run it unless they offered nutrition or asked to set up diet.
 
 ### 3b. Habits (once, after the plan minimum)
 
@@ -113,6 +115,27 @@ If a covering plan for this week has that exercise, load `training-plan` instead
 
 Adding or removing pairs later: same as habits — full confirmed array, keep unrelated pairs.
 
+### 3d. Nutrition profile (optional, startable anytime)
+
+If they say `jag vill sätta upp kosten`, mention weight/height for calories, or offer a calorie target: run this cluster. 2–4 questions per turn. Do not block `training-plan`.
+
+Clinical flags (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target): observation in chat, tell them to seek care, **do not** change `safety_status`, **do not** calculate or write `target_kcal`. Other nutrition fields they still confirm may be saved. Same as a food reaction.
+
+Ask, in this order, only for gaps:
+
+1. `nutrition.goal` if missing (closed enum in `references/profile-fields.md`)
+2. `dietary_pattern`, allergies, exclusions, preferences. Confirmed no allergies → save `allergies: []` with provenance
+3. `body.sex`, `body.birth_year`, `body.height_cm`, `body.weight_kg`
+4. Optional `nutrition.kitchen`: which meals they actually eat, weekday `time_min`, `skill` (`beginner | intermediate | advanced`)
+5. Library once: *Vad äter du ofta till lunch eller middag?* Same spirit as §3b. `nej` / `hoppa` → omit `nutrition.library`. Do not save `[]`
+6. If the calorie-target minimum in `references/profile-fields.md` is present and no clinical flag: load `skills/training-nutrition/references/energy.md`, compute BMR/TDEE as **Mina slutsatser**, propose `target_kcal` on the confirmation card. Wait for `godkänn`. Never write BMR/TDEE
+
+`lägg till matvana` / `spara receptet` / `ta bort` a library item with no live meal suggestion: load current `nutrition.library`, draft the merged list, confirm, then `profile_updated`. Keep unrelated items. Provenance key is `nutrition.library` for the whole array. If they are in a meal-suggestion turn, `training-nutrition` may write the library instead.
+
+Updating `body.weight_kg`: if they report a weigh-in (`väger 88,6`), `training-nutrition` §7 logs `body_weight_logged` and syncs the profile. If they change weight as a profile edit here, write the new weight after approval **and** insert `body_weight_logged` for that date so history stays complete. Recalculate and **propose** a new `target_kcal`; do not overwrite the old target without a new `godkänn` (`energy.md` stale rule). `justera kalorimål` / follow-up against this week’s training and food is `training-nutrition` §6.
+
+If they both confirm a staple and report eating it today, save the library here, then log today's instance with `training-nutrition`.
+
 ### 4. Show a confirmation card
 
 In Swedish, clearly labelled:
@@ -140,7 +163,7 @@ Then insert `user_profiles` with:
 
 **Later save (row exists):**
 
-Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never `data = :data` — that drops unrelated keys. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits` and `equipment.home_gym_substitutions`, write the full confirmed array (add, change, or remove items they approved).
+Insert `profile_updated` (and `safety_screening_completed` if screening changed). Update `user_profiles` by merging new confirmed keys into `data` and `provenance`. Never `data = :data` — that drops unrelated keys. Never delete unrelated confirmed keys unless the user asked to remove them. For `lifestyle.habits`, `equipment.home_gym_substitutions`, and `nutrition.library`, write the full confirmed array (add, change, or remove items they approved).
 
 Do not UPDATE `events`.
 
@@ -207,7 +230,7 @@ set
 where user_id = :USER_ID;
 ```
 
-A single top-level key (example `modalities`): `data = jsonb_set(data, '{modalities}', :modalities::jsonb)`. Same `jsonb_set` pattern as `equipment.home_gym_substitutions` in `training-plan`. If the substitutions array would be empty, `data = data #- '{equipment,home_gym_substitutions}'` and drop that provenance key — do not save `[]`.
+A single top-level key (example `modalities`): `data = jsonb_set(data, '{modalities}', :modalities::jsonb)`. Same `jsonb_set` pattern as `equipment.home_gym_substitutions` in `training-plan`. If the substitutions array would be empty, `data = data #- '{equipment,home_gym_substitutions}'` and drop that provenance key — do not save `[]`. Nested nutrition keys (`energy`, `kitchen`, `library`) use the same `jsonb_set` + coalesce parent object pattern as `lifestyle.habits` above. Body fields: `jsonb_set` on `{body}` then the field, or merge the whole `body` object they approved.
 
 ## Dialogue
 

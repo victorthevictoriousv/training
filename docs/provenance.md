@@ -35,6 +35,8 @@ Inference (do not save as profile fact):
 
 > Min slutsats (inte sparad som faktum): tre styrkepass och ett lugnt jogpass passar troligen bättre än fyra hårda pass.
 
+> Min slutsats (inte sparad som faktum): BMR och TDEE från bekräftad kropp. Kalorimålet sparas bara efter `godkänn`. Ny vikt skriver inte över målet av sig själv.
+
 ## Event pairing
 
 | Write | Required event |
@@ -47,6 +49,8 @@ Inference (do not save as profile fact):
 | Replacing a queued future `proposed` week | `plan_superseded` on that proposed row, then `plan_proposed` on the new (still not `active`) |
 | Exercise log or weight correction | `exercise_logged` (append; latest wins; PR uses current rows only) |
 | Extra-plan activity or a correction of it | `activity_logged` (append; latest per date + `activity_key` + `instance` wins; new bout vs correction per log-schema) |
+| Meal log or a correction of it | `food_logged` (append; same instance rules as `activity_logged`; `slot` in place of `activity_key`) |
+| Body-weight log or a correction of it | `body_weight_logged` (append; latest per date wins; syncs `data.body.weight_kg`) |
 | Finished or skipped session | `session_completed` or `session_missed` |
 
 Insert events; never update or delete them.

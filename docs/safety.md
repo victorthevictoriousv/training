@@ -41,6 +41,14 @@ Use `cleared` only when screening answers are negative and the user has confirme
 
 `unknown` means screening has not been completed. `training-plan` must not run.
 
+## Nutrition flags do not change `safety_status`
+
+Eating-disorder disclosure, a clinician-prescribed diet, or insulin-treated diabetes when they ask for a strict calorie target are **not** `stop` flags. They do not change `safety_status` and they do not block a training plan.
+
+Handle them locally in `training-nutrition` (and in `training-onboarding` if they come up during nutrition questions): refuse `target_kcal` calculation and write, tell them in Swedish to seek appropriate care, write nothing to `user_profiles` for that flag. Same pattern as a food reaction: observation in chat, not a diagnosis, not a profile status.
+
+Allergies and exclusions are hard avoids in meal suggestions, not safety-status changes.
+
 ## Screening questions (ask in Swedish)
 
 Ask one cluster at a time, not a medical interrogation. Cover:

@@ -15,6 +15,19 @@ Confirmed fields only in `user_profiles.data`. Paths below are also `provenance`
 
 `onboarding_status = complete` only when this set is confirmed.
 
+## Minimum for a calorie target
+
+| Path | Required |
+| --- | --- |
+| `safety_status` column | `cleared` or `restricted` |
+| `body.sex` | yes |
+| `body.birth_year` | yes |
+| `body.height_cm` | yes |
+| `body.weight_kg` | yes |
+| `nutrition.goal` | yes |
+
+Allergies are asked; confirmed empty `nutrition.allergies` is enough. Kitchen and library are optional. Clinical nutrition flags refuse this write without changing `safety_status`.
+
 ## Field dictionary
 
 ### `goals`
@@ -56,6 +69,17 @@ Do not store a fixed weekly quota of strength sessions + run sessions. That is t
 
 Do not ask a form of missing machines during onboarding. Capture organically when they mean an exercise is unavailable at the routine gym, or via later add/remove. Provenance key: `equipment.home_gym_substitutions` for the whole array. Write the full confirmed array on each update (add, change, or remove pairs they approved). Keep unrelated pairs. Omit the key until at least one pair is confirmed. Do not invent a pair from a this-week swap.
 
+### `body` (optional until a calorie target)
+
+Anthropometrics for energy estimates. Not a diagnosis. Not required for `training-plan`.
+
+- `sex`: `male | female`
+- `birth_year`: integer year
+- `height_cm`: number
+- `weight_kg`: number
+
+Provenance keys are dotted paths (`body.sex`, `body.weight_kg`, …). Updating `weight_kg` does not auto-rewrite `nutrition.energy.target_kcal`.
+
 ### `health`
 
 User's own words, not diagnoses.
@@ -71,13 +95,14 @@ If they name a drug, set `medications_mentioned: true` and write an `events` obs
 
 - `goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`
 - `dietary_pattern` (optional): `omnivore | vegetarian | vegan | pescatarian | other`
-- `allergies`: string array
+- `allergies`: string array. Confirmed `[]` with provenance means no known allergies
 - `exclusions`: string array
 - `preferences`: string array — free-text notes beyond the structured fields above (e.g. "gillar inte fisk")
+- `kitchen` (optional): `meals` (`breakfast | lunch | dinner | evening | snack`), `time_min` (weekday cooking minutes), `skill` (`beginner | intermediate | advanced`)
+- `energy.target_kcal` (optional integer): working daily target after `godkänn`. Never BMR, TDEE, macros, or MET. Does not auto-update when weight changes. Follow-up may replace it after a new `godkänn`
+- `library` (optional): array of staples and recipes. Provenance key `nutrition.library` for the whole array. See `skills/training-nutrition/references/library.md`
 
-Collect if offered. `training-nutrition` turns these into chat-only
-suggestions (tone only: `lose_weight` is not a diet or kcal target); this
-skill still owns the write. Do not generate meal plans here.
+Collect nutrition if offered, or when they say they want to set up diet (`jag vill sätta upp kosten`). Ask once what they often eat (library), same spirit as habits in §3b. `training-onboarding` still owns `body.*`, `nutrition.goal` / pattern / allergies, and `target_kcal`. `training-nutrition` may write `library` after approval in the same turn as a suggestion. Do not generate a weekly menu here.
 
 ### `recovery` / `life` (optional)
 
@@ -119,7 +144,7 @@ Use this when the user asks what you still need.
 | --- | --- |
 | Better programming | `experience.*` for selected modalities, `availability.windows`, `availability.two_a_day`, `equipment.items`, `health.injuries`, `lifestyle.habits`, `recovery.sleep_hours` / `recovery.stress` |
 | Logging / review (later) | nothing required in v1 |
-| Nutrition | `nutrition.goal`, `nutrition.dietary_pattern`, `nutrition.allergies`, `nutrition.exclusions`, `nutrition.preferences`, `lifestyle.habits` |
+| Nutrition | `nutrition.goal`, `nutrition.dietary_pattern`, `nutrition.allergies`, `nutrition.exclusions`, `nutrition.preferences`, `nutrition.kitchen`, `nutrition.energy.target_kcal`, `nutrition.library`, `body.sex`, `body.birth_year`, `body.height_cm`, `body.weight_kg`, `lifestyle.habits` |
 
 ## Provenance entry
 

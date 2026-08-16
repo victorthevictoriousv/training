@@ -1,6 +1,6 @@
 ---
 name: training-log-and-review
-description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, catching up habits after a quiet week, or a weekly overview of what happened (hur gick veckan / sammanfatta / vad har jag gjort på veckonivå). Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, asks for last weights, personal bests, or results, or wants a read-only summary of the covering week. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, or give meal plans (that is training-nutrition). If they also want extra work put in the week, remaining days adapted, or next week drafted, log or show the overview first, then load training-plan.
+description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, catching up habits after a quiet week, or a weekly overview of what happened (hur gick veckan / sammanfatta / vad har jag gjort på veckonivå). Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, asks for last weights, personal bests, or results, or wants a read-only summary of the covering week. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, or give meal plans, log meals, or log body weight (that is training-nutrition). If they also want extra work put in the week, remaining days adapted, or next week drafted, log or show the overview first, then load training-plan.
 ---
 
 # training-log-and-review
@@ -11,6 +11,7 @@ Record what actually happened. Do not invent loads.
 
 - Create or rewrite the weekly plan (load `training-plan`). Log first if they already did the work; do not UPDATE `plans` here
 - Save a recurring habit to the profile (load `training-onboarding`)
+- Log meals or write `food_logged` (load `training-nutrition`)
 - Invent kilogram values the user did not state or confirm on the shortcut card (copied last working after one `godkänn` is allowed)
 - Store kcal, MET, or TDEE
 - UPDATE or DELETE `events`

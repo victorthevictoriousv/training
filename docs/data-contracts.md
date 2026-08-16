@@ -91,8 +91,10 @@ Event types:
 - `session_completed`
 - `session_missed`
 - `activity_logged`
+- `food_logged`
+- `body_weight_logged`
 
-Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PRs live in `exercise_prs` (one row per `exercise_key`): max numeric `load_kg`, max `distance_km` / `duration_min`, and fastest pace from **current** logs (latest row per date; a correction replaces that date). Read with `Q_pr`. Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Do not UPDATE earlier rows. Do not mix `activity_logged` into exercise PR or last-load queries.
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PRs live in `exercise_prs` (one row per `exercise_key`): max numeric `load_kg`, max `distance_km` / `duration_min`, and fastest pace from **current** logs (latest row per date; a correction replaces that date). Read with `Q_pr`. Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Current meals for a date use the same instance rules as `activity_logged`, with `slot` in place of `activity_key`: latest `food_logged` per `user_id + payload.date + payload.slot + payload.instance` (missing `instance` = 1). Current body weight for a date is the latest `body_weight_logged` for `user_id + payload.date`. `data.body.weight_kg` is the latest confirmed current weight (kept in sync on each log). Do not UPDATE earlier rows. Do not mix `activity_logged`, `food_logged`, or `body_weight_logged` into exercise PR or last-load queries.
 
 ### `exercise_prs`
 
@@ -181,12 +183,35 @@ Only confirmed fields. Omit keys that are not yet confirmed.
     "conditions": [],
     "medications_mentioned": false
   },
+  "body": {
+    "sex": "male",
+    "birth_year": 1990,
+    "height_cm": 180,
+    "weight_kg": 80
+  },
   "nutrition": {
     "goal": "build_muscle",
     "dietary_pattern": "omnivore",
     "allergies": [],
     "exclusions": [],
-    "preferences": []
+    "preferences": [],
+    "kitchen": {
+      "meals": ["lunch", "dinner", "evening"],
+      "time_min": 30,
+      "skill": "intermediate"
+    },
+    "energy": {
+      "target_kcal": 2800
+    },
+    "library": [
+      {
+        "key": "chicken_rice_broccoli",
+        "name": "Kyckling, ris, broccoli",
+        "kind": "staple",
+        "slots": ["lunch", "dinner"],
+        "notes": ""
+      }
+    ]
   },
   "recovery": {
     "sleep_hours": null,
@@ -243,7 +268,11 @@ Field rules:
 - `availability.anchor` is optional preference text the planner may drop under poor recovery or time pressure
 - `health.*` stores the user's own words and lists, not diagnoses
 - `medications_mentioned` is a boolean flag only. Do not store drug names in `data`. If the user mentions medication, record an observation event and never give medication advice
-- `nutrition.goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`. `nutrition.dietary_pattern`: `omnivore | vegetarian | vegan | pescatarian | other`. Both are closed enums. `allergies`, `exclusions`, and `preferences` stay string arrays. Optional. `training-nutrition` reads these as tone, not as a diet: `lose_weight` never becomes a deficit or kcal target. Never store kcal, macros, or TDEE here
+- `body.sex`: `male | female`. `body.birth_year`: integer year. `body.height_cm`, `body.weight_kg`: numbers. Optional until they want a saved calorie target. Not a diagnosis. Provenance keys are dotted paths (`body.sex`, `body.weight_kg`, …)
+- `nutrition.goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`. `nutrition.dietary_pattern`: `omnivore | vegetarian | vegan | pescatarian | other`. Both are closed enums. `allergies`, `exclusions`, and `preferences` stay string arrays. Optional. Confirmed empty `allergies: []` (with provenance) means no known allergies — do not omit the key to mean that. `lose_weight` may become a modest confirmed deficit in `nutrition.energy.target_kcal` (see energy rules), never a clinical diet
+- `nutrition.kitchen` is optional. `meals`: array of `breakfast | lunch | dinner | evening | snack`. `time_min`: weekday cooking minutes. `skill`: `beginner | intermediate | advanced`
+- `nutrition.energy.target_kcal` is an integer daily target, stored only after explicit approval. Never store BMR, TDEE, macros, or MET here. Updating `body.weight_kg` does not auto-rewrite `target_kcal`. The target is a working number: replace it after a new `godkänn` when follow-up supports a change
+- `nutrition.library` is optional. Confirmed go-to meals and saved recipes. Provenance key is `nutrition.library` for the whole array. Each item: `key` (lowercase snake_case), `name`, `kind` (`staple | recipe`), `slots` (same enum as kitchen meals), `notes`. `recipe` items may also have `time_min`, `servings`, `ingredients` (`name`, optional `amount` / `unit`), `method`. Omit the array until at least one item is confirmed. Do not save `[]`. Do not store kcal on library items
 - `modalities` is the set the user wants in weekly plans
 - `lifestyle.habits` is optional. Recurring activity outside the four training modalities. Pattern only: an instance must be `activity_logged` to count as done. Do not store kcal, MET, or TDEE here
 - habit `kind`: `lifestyle` (easy everyday movement or easy mobility/yoga ritual) or `extra` (recreational load such as climbing or hiking)
@@ -288,6 +317,21 @@ Keys are dotted paths into `data`, plus `safety_status` when screening is confir
 - `data.modalities` (non-empty)
 
 If `safety_status` is `restricted`, the plan must stay conservative and respect stated injuries and pain.
+
+## Minimum profile for a calorie target
+
+`training-nutrition` / `training-onboarding` may save `nutrition.energy.target_kcal` only when all of the following are confirmed:
+
+| Path | Required |
+| --- | --- |
+| `safety_status` column | `cleared` or `restricted` (never `stop` or `unknown`) |
+| `body.sex` | yes |
+| `body.birth_year` | yes |
+| `body.height_cm` | yes |
+| `body.weight_kg` | yes |
+| `nutrition.goal` | yes |
+
+Allergies are asked; a confirmed empty `nutrition.allergies` array is enough. `nutrition.kitchen` and `nutrition.library` are optional. Clinical nutrition flags (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target) refuse this write without changing `safety_status`.
 
 ## `plans.content`
 
@@ -449,6 +493,49 @@ Lifestyle or recreational activity. Background walks and background yoga are nev
 - Store what the user said, or the habit `typical_*` when they named the habit with no numbers. Do not derive `distance_km` from speed × time as a confirmed value
 - Do not store kcal
 - Latest row for `user_id + date + activity_key + instance` is current for that bout. Corrections (`nej`, `rättelse`) reuse `instance`. A new log line the same day without that language is a new `instance`. Sum current bouts for the day's load
+
+`food_logged`
+
+Optional meal log. Same instance rules as `activity_logged` above; `slot` plays `activity_key`'s role. Skills must not invent a second variant. `training-nutrition` writes these, not `training-log-and-review`.
+
+```json
+{
+  "date": "2026-08-16",
+  "slot": "dinner",
+  "library_key": "chicken_rice_broccoli",
+  "name": "Kyckling, ris, broccoli",
+  "instance": 1,
+  "notes": "",
+  "raw_text": "åt kycklingris till middag"
+}
+```
+
+- `slot`: `breakfast | lunch | dinner | evening | snack`
+- `library_key`: matching confirmed `nutrition.library[].key`, or null for free text
+- `instance`: 1-based bout that day for this `slot`. A second lunch the same day is `2`. Missing on old rows means `1`
+- Store what the user said, or the library item's `name` / notes when they named a staple or recipe with no extra detail. Echo `(enligt vana)` in that case
+- Do not store kcal
+- Latest row for `user_id + date + slot + instance` is current for that bout. Corrections (`nej`, `rättelse`) reuse `instance`. A new log line the same day without that language is a new `instance`
+
+`body_weight_logged`
+
+Optional weigh-in. One current value per date. `training-nutrition` writes these. Also keeps `data.body.weight_kg` in sync. Does **not** rewrite `nutrition.energy.target_kcal`.
+
+```json
+{
+  "date": "2026-08-16",
+  "weight_kg": 88.6,
+  "notes": "",
+  "raw_text": "väger 88,6"
+}
+```
+
+- `weight_kg`: number the user stated
+- Latest row for `user_id + date` is current for that day. Corrections (`nej`, `rättelse`) are a new row; latest wins
+- Do not store kcal
+- Weekly mean for follow-up is the mean of current (latest-per-date) logs in the covering week. Sparse logs are unknown trend, not a plateau
+
+`nutrition.energy.target_kcal` is a working number. It may be replaced after `godkänn` when follow-up against training logs, optional food logs, weight, hunger, and recovery supports a change. Never auto-rewrite from a formula or a single log.
 
 ## Identity in v1
 

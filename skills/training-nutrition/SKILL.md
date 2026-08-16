@@ -1,51 +1,63 @@
 ---
 name: training-nutrition
-description: Give simple meal suggestions tied to training, goals, recovery,
-  confirmed lifestyle habits, and recent activity. Use when the user asks what
-  to eat, wants a meal or snack suggestion, asks how to fuel a session or
-  recover from one, mentions a food reaction or new allergy, or asks about
-  their saved nutrition preferences. Match intent, not exact wording. Do not
-  use to collect or change nutrition.* profile fields (that is
-  training-onboarding), create or change weekly plans (training-plan), log
-  exercises or extra-plan activity (training-log-and-review), diagnose
-  conditions, give clinical or medically restrictive diets, or store kcal,
-  macros, or TDEE anywhere.
+description: Give meal suggestions from confirmed nutrition preferences, the
+  food/recipe library, and recent training. Use when the user asks what to eat,
+  wants lunch/dinner/evening ideas, asks how to fuel a session or recover from
+  one, reports a meal they ate, logs a body weight, wants to save a recipe or
+  food staple from a suggestion, asks how diet is going, wants the calorie
+  target reviewed or adjusted against training and food logs, mentions a food
+  reaction or new allergy, or asks about saved nutrition preferences. Match
+  intent, not exact wording. Do not use to collect the first nutrition profile
+  (that is training-onboarding), create or change weekly training plans
+  (training-plan), or log exercises or extra-plan activity
+  (training-log-and-review). Do not diagnose conditions or give clinical diets.
 ---
 
 # training-nutrition
 
-Give simple meal suggestions in chat. Write nothing.
+Give meal suggestions in chat. Log meals and weigh-ins they report. Review diet against training and food. Save library items and an adjusted `target_kcal` after approval.
 
 ## Do not
 
-- Collect, confirm, or write `nutrition.*` (or any) profile fields — hand off to `training-onboarding`
+- Collect the **first** nutrition profile (`body.*` other than a weigh-in, `nutrition.goal` / pattern / allergies / exclusions / preferences, `nutrition.kitchen`) — hand off to `training-onboarding`
+- Auto-rewrite `target_kcal` from a formula, a new weight, or a single log. Propose, wait for `godkänn`, then write
 - Create or change weekly training plans — hand off to `training-plan`
 - Log exercises, sessions, or extra-plan activity — hand off to `training-log-and-review`
-- Diagnose a food reaction, allergy, or condition; give clinical, medically restrictive, or weight-loss diets
-- Store kcal, macros, MET, or TDEE anywhere, confirmed or not
-- Write `recommendations`, `plans`, `user_profiles`, or `events` — this skill never writes
-- Give a tailored suggestion if `safety_status` is `stop` or `unknown`
+- Diagnose a food reaction, allergy, or condition; give clinical or medically restrictive diets
+- Store BMR, TDEE, macros, or MET anywhere
+- Write `recommendations` or `plans`
+- Change `safety_status` for a nutrition disclosure
+- Give a tailored training-fuel suggestion if `safety_status` is `stop` or `unknown`
+- Nag them to log meals or weigh-ins. Do not say remaining kcal
 
 ## Intent
 
-Classify once. Run only those ids from `skills/_shared/queries.md`. This skill has no writes.
+Classify once. Run only those ids from `skills/_shared/queries.md`. Match meaning, not a phrase list. Examples in the table are illustrations (`väger 88,6`, `åt X`, `hur går kosten`) — same as gym logging.
 
 | User means | Section | Queries | Skip |
 | --- | --- | --- | --- |
-| Meal/snack suggestion, “vad ska jag äta”, fuel/recover from a session | §2 | `Q_profile`, `Q_covering_plan`, `Q_today_logs`, `Q_today_activity` | writes, `Q_pr` |
-| Nutrition tied to the whole week | §2 (week variant) | Same as a day, plus `Q_week_events`, `Q_habits` | `Q_pr`, `Q_recent_working` |
+| Meal/snack suggestion, “vad ska jag äta”, lunch+middag+kväll, fuel/recover from a session | §2 | `Q_profile`, `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_today_food` | `Q_pr` |
+| Nutrition tied to the whole week | §2 (week variant) | Same as a day, plus `Q_week_events`, `Q_week_food`, `Q_habits` | `Q_pr`, `Q_recent_working` |
+| How diet is going / justera kalorier / följ upp mot träning och mat | §6 | `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` | `Q_pr`, plan writes |
+| Reported a meal (“åt X”, “vanlig lunch”) | §4 | `Q_profile`, `Q_today_food` | plan writes |
+| Weigh-in (“väger 88,6”, “ny vikt”) | §7 | `Q_profile` | auto-changing `target_kcal` |
+| Save this suggestion as a staple/recipe | §5 | `Q_profile` | `food_logged` unless they also ate it |
 | Reported food reaction / new allergy | §3 | `Q_profile` | writing it here |
-| “What preferences do you have saved?” | §1 | `Q_profile` | others |
+| “What preferences do you have saved?” / calorie target | §1 | `Q_profile` | others |
+| First-time diet setup, change goal/allergies/kitchen | hand off to `training-onboarding` §3d | `Q_profile` if already loaded | writes here |
 
 ## Before you start
 
 Read, in this order if not already in context (repo paths; from this skill folder use `../../docs/`):
 
 - `docs/safety.md`
+- `docs/autonomy.md`
 - `docs/provenance.md`
 - `docs/data-contracts.md`
 - `skills/_shared/queries.md`
 - `references/meal-suggestions.md`
+- `references/energy.md` when they ask about energy or a target, or when proposing `target_kcal` via onboarding
+- `references/library.md` when reading or writing `nutrition.library`
 
 Use `USER_ID` from the Project instructions. Filter every query on that id.
 
@@ -53,26 +65,143 @@ Use `USER_ID` from the Project instructions. Filter every query on that id.
 
 ### 1. Saved preferences
 
-Run `Q_profile`. Answer from confirmed `data.nutrition` only. Missing keys are unknown, not a guess. If they want to add or change a field, hand off to `training-onboarding`. Do not write.
+Run `Q_profile`. Answer from confirmed `data.nutrition` and `data.body` only. Missing keys are unknown, not a guess. If they want to add or change a field other than `nutrition.library` in this turn, hand off to `training-onboarding`. Do not write those fields here.
+
+If they ask what their calorie target is: print confirmed `nutrition.energy.target_kcal` if present, and that it is a working number they can change. BMR/TDEE only as **Mina slutsatser** from `references/energy.md`, never as saved facts. If they want it reviewed against this week’s training and food, go to §6.
+
+Clinical flags in this conversation (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target): refuse energy calculation and any `target_kcal` write. Tell them to seek care. Do not change `safety_status`. Other suggestions may continue without numbers.
 
 ### 2. Meal or snack suggestion
 
-Run `Q_profile`. Safety gate:
+Run `Q_profile`. Safety gate for **training fuel**:
 
 - `stop` → refuse. Tell them to seek care. Do not suggest food as training fuel.
-- `unknown` → route to `training-onboarding` for screening first. Do not give a tailored suggestion.
+- `unknown` → route to `training-onboarding` for screening first. Do not give a tailored fuel suggestion.
 - `cleared` or `restricted` → continue. If `restricted`, stay conservative.
 
-Missing `nutrition.*` → a generic suggestion is fine. Offer the onboarding handoff for a tailored one.
+Missing `nutrition.*` → a generic suggestion is fine. Offer the onboarding handoff for a tailored one. Missing library is fine: invent 1–3 **Förslag**.
 
-Then run `Q_covering_plan`, `Q_today_logs`, and `Q_today_activity` (date = today in `Europe/Stockholm` unless they named a day). For a week-level ask, also `Q_week_events` (`:period_start` / `:period_end` from the covering row) and `Q_habits`.
+Then run `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, and `Q_today_food` (date = today in `Europe/Stockholm` unless they named a day). For a week-level ask, also `Q_week_events`, `Q_week_food` (`:period_start` / `:period_end` from the covering row), and `Q_habits`.
 
-Use what actually happened (`exercise_logged`, `activity_logged`, `session_completed`), not the aspirational plan. Compose 1–3 Swedish options from confirmed `nutrition.goal`, `dietary_pattern`, `allergies`, `exclusions`, `preferences`, plus real training/activity load. Rules in `references/meal-suggestions.md`. `lose_weight` is tone (simpler/lighter meals), never a deficit, restriction, or kcal target. Never print kcal, macros, or TDEE. Label the reply **Förslag** — nothing is saved.
+Use what actually happened (`exercise_logged`, `activity_logged`, `session_completed`), not the aspirational plan. Prefer confirmed `nutrition.library` items whose `slots` match the ask. Skip a slot that already has a current `food_logged`. Compose 1–3 Swedish options. Rules in `references/meal-suggestions.md` and `references/library.md`.
+
+`lose_weight` with a saved `target_kcal` may shape portions as a modest deficit (see `energy.md`); never a clinical restriction. Mention `target_kcal` only if it is saved **and** they asked about amount/energy — not on every dinner tip.
+
+Label the reply **Förslag**. Offer once: spara som recept / lägg i vanearkivet. Nothing is a saved meal plan.
+
+“Ge mig lunch, middag och kväll” = three slot suggestions in one turn, vary library items, fill gaps with new **Förslag**.
 
 ### 3. Food reaction or new allergy
 
 Note it as their observation (`docs/provenance.md`), not a diagnosis. If they want it remembered, hand off to `training-onboarding` to confirm into `nutrition.allergies` or `nutrition.exclusions`. Write nothing here.
 
+### 4. Log a meal
+
+A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Reuse `activity_logged` instance rules in `docs/autonomy.md` and `docs/data-contracts.md`; `slot` plays `activity_key`'s role. Do not invent a second variant.
+
+- Run `Q_today_food` for that date (default today in `Europe/Stockholm`).
+- New bout: `instance` = one more than today's max for that `slot` (start at 1).
+- `nej` / `rättelse` keeps the latest `instance` for that slot.
+- Named library item with no extra detail: copy `name` / `library_key` from `nutrition.library`, echo `(enligt vana)`.
+- `INSERT` `food_logged` (`source = user`, `source_status = confirmed`). Echo **Sparat:**. No second `godkänn`.
+- Do not store kcal. Do not nag. Do not summarise remaining energy unless they asked (“vad åt jag idag?”).
+
+```sql
+insert into events (
+  user_id, type, source, source_status, payload
+) values (
+  :USER_ID,
+  'food_logged',
+  'user',
+  'confirmed',
+  :payload::jsonb
+);
+```
+
+If `INSERT` fails because `type` is not allowed (`food_logged` missing from `events_type_check`): say in Swedish that the live database is missing that event type. Do not tell them to rephrase. Do not run DDL. Do not write a substitute `type`.
+
+### 5. Save a staple or recipe
+
+When they want this suggestion (or a named meal) remembered, in this same turn:
+
+1. Draft the merged `nutrition.library` array (`references/library.md`). Keep unrelated items.
+2. Confirmation card: **Bekräftade förslag** / **Fortfarande okänt** / **Mina slutsatser**.
+3. After `godkänn`: insert `profile_updated`, then `jsonb_set` `data.nutrition.library` (coalesce parent `nutrition` like onboarding does for habits). Provenance key `nutrition.library` for the whole array. If the array would be empty, omit the key — do not save `[]`.
+
+```sql
+update user_profiles
+set
+  data = jsonb_set(
+    jsonb_set(
+      data,
+      '{nutrition}',
+      coalesce(data->'nutrition', '{}'::jsonb)
+    ),
+    '{nutrition,library}',
+    :library::jsonb
+  ),
+  provenance = jsonb_set(
+    provenance,
+    '{nutrition.library}',
+    jsonb_build_object(
+      'source', 'user',
+      'status', 'confirmed',
+      'confirmed_at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'event_id', :event_id
+    )
+  )
+where user_id = :USER_ID;
+```
+
+If the array would be empty: `data = data #- '{nutrition,library}'` and drop `nutrition.library` from provenance — do not save `[]`.
+
+This is the same exception as `training-plan` writing `home_gym_substitutions`. Goal, allergies, and kitchen still go through `training-onboarding`. `target_kcal` after a follow-up card is §6.
+
+If they also ate it today, log §4 in the same turn after the library write (or without it if they reject the save).
+
+### 6. Follow-up (working target, not a lock)
+
+How diet is going. Read training, optional meals, and weights. Draw conclusions. Do not nag for missing food logs.
+
+1. Run `Q_profile`. Clinical flags → refuse a new `target_kcal`; do not change `safety_status`.
+2. Run `Q_covering_plan`. No row → say so; you may still use `data.body` and `target_kcal`. Do not invent a training week.
+3. If a covering row exists: `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` with that period.
+4. Swedish card, three layers (`docs/provenance.md`):
+   - **Fakta** — saved `target_kcal`; current `body.weight_kg`; current weigh-ins this week (latest per date); logged sessions/activity; logged meals (slots present, not kcal). Sparse food = unknown intake, not “they under-ate”.
+   - **Fortfarande okänt** — no food logs, fewer than two weigh-ins, no training logs, hunger/energy they have not described.
+   - **Mina slutsatser** — rules in `references/energy.md` (review). At most **one** proposed change (target ±100–200, more carbohydrate around hard sessions, or add a staple). Do not change several things at once.
+5. If they `godkänn` a new `target_kcal`: insert `profile_updated`, then `jsonb_set` `nutrition.energy.target_kcal`. Same coalesce pattern as library. Do not write BMR/TDEE.
+
+Do not write `recommendations`. Do not mix this into the training weekly overview (`training-log-and-review` §8).
+
+### 7. Log a weigh-in
+
+A clear line (`väger 88,6`, `88.6 kg idag`) is user confirmation. No second `godkänn`.
+
+- Date = today in `Europe/Stockholm` unless they named a day.
+- `INSERT` `body_weight_logged` (`source = user`, `source_status = confirmed`).
+- `jsonb_set` `data.body.weight_kg` to that number. Provenance `body.weight_kg` with this event’s id. Do not insert a separate `profile_updated`.
+- Echo **Sparat:** the kg. Do **not** rewrite `target_kcal`. Optionally one line: weight changed; say till if they want the target reviewed (§6).
+
+```sql
+insert into events (
+  user_id, type, source, source_status, payload
+) values (
+  :USER_ID,
+  'body_weight_logged',
+  'user',
+  'confirmed',
+  :payload::jsonb
+)
+returning id;
+```
+
+Then `jsonb_set` `{body,weight_kg}` and provenance `{body.weight_kg}` with that `id`. If `INSERT` fails because the type is missing: say the live schema is missing `body_weight_logged`. Do not run DDL.
+
+`nej` / `rättelse` → another `body_weight_logged` for that date; latest wins; update `data.body.weight_kg` to the new number.
+
+Changing goal, allergies, or kitchen is still `training-onboarding` §3d.
+
 ## Dialogue
 
-Speak Swedish. Keep it short. Always label suggestions **Förslag**. Never present a meal as a saved fact unless they confirmed the preference via `training-onboarding`.
+Speak Swedish. Keep it short. Always label suggestions **Förslag**. Never present a meal as a saved fact unless it is in `nutrition.library` or they just logged it. Never present BMR/TDEE as confirmed.
