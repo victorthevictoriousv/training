@@ -7,11 +7,11 @@ Chat suggestions are **Förslag**. They are not a saved weekly menu. Do not writ
 - Diagnose a food reaction, allergy, or condition.
 - Give clinical or medically restrictive diets. `lose_weight` with a saved `target_kcal` is a modest deficit (`references/energy.md`), not a clinical restriction.
 - Advise starting, stopping, or changing medication.
-- Store BMR, TDEE, macros, or MET. Store `target_kcal` only via onboarding after `godkänn`.
+- Store BMR, TDEE, macros, or MET on the profile or library. Store `target_kcal` only via onboarding after `godkänn`. Do not print kcal or protein on **Förslag** unless they asked about amount or energy. Those numbers live on `food_logged`, not on the suggestion.
 - Treat the weekly plan as what they ate or trained — use logged activity.
 - Change `safety_status` for a nutrition disclosure.
 - Give a tailored suggestion if `safety_status` is `stop` or `unknown`.
-- Nag meal logging or print remaining kcal.
+- Nag meal logging or print remaining kcal or remaining protein.
 
 ## Tie to real activity
 

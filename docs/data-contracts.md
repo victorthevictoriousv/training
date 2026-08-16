@@ -271,8 +271,8 @@ Field rules:
 - `body.sex`: `male | female`. `body.birth_year`: integer year. `body.height_cm`, `body.weight_kg`: numbers. Optional until they want a saved calorie target. Not a diagnosis. Provenance keys are dotted paths (`body.sex`, `body.weight_kg`, …)
 - `nutrition.goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`. `nutrition.dietary_pattern`: `omnivore | vegetarian | vegan | pescatarian | other`. Both are closed enums. `allergies`, `exclusions`, and `preferences` stay string arrays. Optional. Confirmed empty `allergies: []` (with provenance) means no known allergies — do not omit the key to mean that. `lose_weight` may become a modest confirmed deficit in `nutrition.energy.target_kcal` (see energy rules), never a clinical diet
 - `nutrition.kitchen` is optional. `meals`: array of `breakfast | lunch | dinner | evening | snack`. `time_min`: weekday cooking minutes. `skill`: `beginner | intermediate | advanced`
-- `nutrition.energy.target_kcal` is an integer daily target, stored only after explicit approval. Never store BMR, TDEE, macros, or MET here. Updating `body.weight_kg` does not auto-rewrite `target_kcal`. The target is a working number: replace it after a new `godkänn` when follow-up supports a change
-- `nutrition.library` is optional. Confirmed go-to meals and saved recipes. Provenance key is `nutrition.library` for the whole array. Each item: `key` (lowercase snake_case), `name`, `kind` (`staple | recipe`), `slots` (same enum as kitchen meals), `notes`. `recipe` items may also have `time_min`, `servings`, `ingredients` (`name`, optional `amount` / `unit`), `method`. Omit the array until at least one item is confirmed. Do not save `[]`. Do not store kcal on library items
+- `nutrition.energy.target_kcal` is an integer daily target, stored only after explicit approval. Never store BMR, TDEE, macros, MET, or a protein target here. Updating `body.weight_kg` does not auto-rewrite `target_kcal`. The target is a working number: replace it after a new `godkänn` when follow-up supports a change
+- `nutrition.library` is optional. Confirmed go-to meals and saved recipes. Provenance key is `nutrition.library` for the whole array. Each item: `key` (lowercase snake_case), `name`, `kind` (`staple | recipe`), `slots` (same enum as kitchen meals), `notes`. `recipe` items may also have `time_min`, `servings`, `ingredients` (`name`, optional `amount` / `unit`), `method`. Omit the array until at least one item is confirmed. Do not save `[]`. Do not store kcal, protein, or other macros on library items. Portion numbers belong on `food_logged`, not on the item
 - `modalities` is the set the user wants in weekly plans
 - `lifestyle.habits` is optional. Recurring activity outside the four training modalities. Pattern only: an instance must be `activity_logged` to count as done. Do not store kcal, MET, or TDEE here
 - habit `kind`: `lifestyle` (easy everyday movement or easy mobility/yoga ritual) or `extra` (recreational load such as climbing or hiking)
@@ -505,6 +505,10 @@ Optional meal log. Same instance rules as `activity_logged` above; `slot` plays 
   "library_key": "chicken_rice_broccoli",
   "name": "Kyckling, ris, broccoli",
   "instance": 1,
+  "kcal": 650,
+  "kcal_source": "estimated",
+  "protein_g": 45,
+  "protein_source": "estimated",
   "notes": "",
   "raw_text": "åt kycklingris till middag"
 }
@@ -514,8 +518,13 @@ Optional meal log. Same instance rules as `activity_logged` above; `slot` plays 
 - `library_key`: matching confirmed `nutrition.library[].key`, or null for free text
 - `instance`: 1-based bout that day for this `slot`. A second lunch the same day is `2`. Missing on old rows means `1`
 - Store what the user said, or the library item's `name` / notes when they named a staple or recipe with no extra detail. Echo `(enligt vana)` in that case
-- Do not store kcal
-- Latest row for `user_id + date + slot + instance` is current for that bout. Corrections (`nej`, `rättelse`) reuse `instance`. A new log line the same day without that language is a new `instance`
+- Optional `kcal` (integer) and `protein_g` (integer). Each has a matching `kcal_source` / `protein_source`: `user | estimated`. The event stays `source = user` (they ate the meal); `*_source` is the source of the *number*
+- Independent omit: kcal without protein and vice versa. If a number is absent, omit **both** keys for that number (`kcal` + `kcal_source`). Do not store `null` or `0` as a stand-in for unknown. `0` is a stated value
+- User-stated numbers: store as said (`kcal_source` / `protein_source` = `user`). Do not invent the other number
+- Concrete vs unclear (no numbers). Estimate both only when the dish or its main foods are known without inventing a recipe: library match; named composed dish; stated portion of a known food. Round estimated kcal to 50, estimated `protein_g` to 5. `*_source` = `estimated`. Omit both when contents or portion are unknown (rester, något, unspecified smoothie/bar/bowl/wrap). If unsure, omit. Do not ask whether to estimate
+- A bare day total without a slot (`åt 2400 kcal idag`) is not a day-level event. Ask once which meal
+- Do not store carbs, fat, or a protein target. Do not write these keys on `nutrition.library`, `activity_logged`, `exercise_logged`, or `body_weight_logged`
+- Latest row for `user_id + date + slot + instance` is current for that bout. Corrections (`nej`, `rättelse`) reuse `instance`. A new log line the same day without that language is a new `instance`. After an estimated echo, bare `nej` is ambiguous (numbers vs whole meal) — ask once, do not write. `nej till siffrorna` drops the number keys (meal stays). `nej, 40 g protein` sets protein to `user` and leaves other numbers as they were. `nej, det var X` is a whole-meal correction. Without an estimate, `nej` corrects the whole meal
 
 `body_weight_logged`
 

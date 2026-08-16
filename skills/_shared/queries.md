@@ -188,7 +188,7 @@ order by occurred_at desc;
 
 ### Q_today_food
 
-`food_logged` on `:date`. Latest row per `slot` + `instance` (missing `instance` = 1). Next bout: `max(instance) + 1` for that date + slot. Same instance rules as `Q_today_activity`. Nutrition only.
+`food_logged` on `:date`. Latest row per `slot` + `instance` (missing `instance` = 1). Next bout: `max(instance) + 1` for that date + slot. Same instance rules as `Q_today_activity`. Nutrition only. Payload may include optional `kcal` / `protein_g` with `*_source`; the query is unchanged.
 
 ```sql
 select payload, occurred_at
@@ -203,7 +203,7 @@ order by occurred_at desc;
 
 ### Q_week_food
 
-`food_logged` in the covering week. Nutrition follow-up only — not the training weekly overview. `:period_start` / `:period_end` from `Q_covering_plan`. Skip if there is no covering row. Latest per `date + slot + instance` is current (same rules as `Q_today_food`).
+`food_logged` in the covering week. Nutrition follow-up only — not the training weekly overview. `:period_start` / `:period_end` from `Q_covering_plan`. Skip if there is no covering row. Latest per `date + slot + instance` is current (same rules as `Q_today_food`). Optional `kcal` / `protein_g` on the payload; sum only rows that have the key (incomplete totals, never fill gaps with 0).
 
 ```sql
 select payload, occurred_at

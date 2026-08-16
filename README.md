@@ -11,7 +11,7 @@ v1 is a ChatGPT Project that:
 - follows versioned skills in this repo
 - reads five Supabase tables through the official Supabase ChatGPT app (`exercise_prs` is trigger-maintained; skills never write it)
 - confirms facts with the user before saving profile and plan drafts
-- logs explicit exercise lines, extra-plan activity, and optional meals without a second confirmation
+- logs explicit exercise lines, extra-plan activity, and optional meals without a second confirmation (optional kcal and protein on the meal, user-stated or estimated)
 - creates a first weekly plan only after the profile is confirmed
 - gives meal suggestions from confirmed nutrition preferences and a food/recipe library (no persisted weekly menu); may save a confirmed daily calorie target
 
@@ -41,7 +41,7 @@ supabase/migrations/   Versioned Postgres schema
 | [skills/training-onboarding/](skills/training-onboarding/) | Collect and confirm the profile |
 | [skills/training-plan/](skills/training-plan/) | Create, show, and change the weekly plan |
 | [skills/training-log-and-review/](skills/training-log-and-review/) | Log sets, loads, extra-plan activity, and completed or missed sessions |
-| [skills/training-nutrition/](skills/training-nutrition/) | Meal suggestions, optional food and weight logs, follow-up, library saves after approval |
+| [skills/training-nutrition/](skills/training-nutrition/) | Meal suggestions, optional food and weight logs (optional kcal/protein on the meal), follow-up, library saves after approval |
 | [skills/_shared/queries.md](skills/_shared/queries.md) | Named `SELECT`s (`Q_*`). Skills name an id; they do not paste SQL |
 | [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) | Initial schema |
 | [supabase/migrations/0002_rls_and_log_events.sql](supabase/migrations/0002_rls_and_log_events.sql) | RLS enabled; `exercise_logged`, `session_completed`, `session_missed` event types |

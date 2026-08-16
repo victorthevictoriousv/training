@@ -12,7 +12,7 @@ The long-term product should:
 - log sessions, results, extra-plan activity (everyday movement, climbing, hiking), body weight, personal bests, perceived effort, and other observations
 - track progress over time
 - adapt after missed sessions, illness, time pressure, travel, poor recovery, or other changes
-- give meal suggestions from a confirmed nutrition profile, a food/recipe library, and recent training; optional food logging; a saved daily calorie target after approval
+- give meal suggestions from a confirmed nutrition profile, a food/recipe library, and recent training; optional food logging with optional kcal and protein on the meal; a saved daily calorie target after approval
 - run weekly reviews
 - separate confirmed facts, user observations, and AI conclusions
 - ask before saving new facts
@@ -39,7 +39,7 @@ v1 implements:
 - `training-onboarding`
 - `training-plan` for the weekly plan and showing saved sessions. Background habits stay out of `plans.content` and count only when logged (`activity_logged`). Scheduled habits (e.g. climbing on a named weekday) become `other` sessions with `habit_key`. Same-day stacking is allowed on some days when the profile says so; it is not a 5+5 template. If a planned exercise is missing at the routine gym, the home alternative is prescribed and the first choice stays on the item as `preferred`; that pair is stored in `equipment.home_gym_substitutions`. A this-week swap (they want another exercise, not that the gym lacks it) does not write the profile
 - `training-log-and-review` for exercise and session logging plus extra-plan activity, and a read-only weekly overview in chat (no write). PRs live in `exercise_prs`, one row per `exercise_key`, kept in sync by a DB trigger on `exercise_logged` from **current** logs (a correction replaces that date) — no skill writes to it directly. Not shown unless asked. Bare “hur gick veckan” on Monday summarizes the week that just ended.
-- `training-nutrition` for meal suggestions from confirmed preferences, a food/recipe library, and recent activity; optional `food_logged` and `body_weight_logged`; follow-up against the covering week’s training and food; may write `nutrition.library` or a new working `target_kcal` after approval. First-time `nutrition.*` / `body.*` via `training-onboarding`
+- `training-nutrition` for meal suggestions from confirmed preferences, a food/recipe library, and recent activity; optional `food_logged` (optional `kcal` / `protein_g` on the meal, user-stated or estimated) and `body_weight_logged`; follow-up against the covering week’s training and food; may write `nutrition.library` or a new working `target_kcal` after approval. First-time `nutrition.*` / `body.*` via `training-onboarding`
 
 v1 does not implement:
 
@@ -70,7 +70,7 @@ Logs completed and missed sessions, per-exercise sets (load, reps, optional RPE)
 
 ### `training-nutrition`
 
-Reads confirmed profile nutrition fields, `data.body`, the food/recipe library, plus recent training and extra-plan activity. Meal suggestions stay chat-only (**Förslag**); there is no weekly meal plan in `plans` and no `recommendations` row. Writes `food_logged` when they report a meal (same instance rules as `activity_logged`, `slot` for `activity_key`) and `body_weight_logged` when they report a weigh-in (syncs `data.body.weight_kg`; does not auto-rewrite `target_kcal`). Follow-up reads the covering week’s training, meals, and weights and may propose a new working `target_kcal` after `godkänn`. May write `nutrition.library` after approval in the same turn as a suggestion. First-time `body.*` / goal / allergies stay `training-onboarding`. BMR/TDEE are inferences. No diagnoses or clinical diets. Food reactions and clinical nutrition flags are chat observations; the latter refuse a calorie target without changing `safety_status`.
+Reads confirmed profile nutrition fields, `data.body`, the food/recipe library, plus recent training and extra-plan activity. Meal suggestions stay chat-only (**Förslag**); there is no weekly meal plan in `plans` and no `recommendations` row. Writes `food_logged` when they report a meal (same instance rules as `activity_logged`, `slot` for `activity_key`; optional `kcal` / `protein_g` with `*_source`) and `body_weight_logged` when they report a weigh-in (syncs `data.body.weight_kg`; does not auto-rewrite `target_kcal`). Follow-up reads the covering week’s training, meals, and weights and may propose a new working `target_kcal` after `godkänn`. May write `nutrition.library` after approval in the same turn as a suggestion. First-time `body.*` / goal / allergies stay `training-onboarding`. BMR/TDEE are inferences. No diagnoses or clinical diets. No stored protein target. Food reactions and clinical nutrition flags are chat observations; the latter refuse a calorie target without changing `safety_status`.
 
 ## Defaults
 
@@ -79,6 +79,6 @@ These are easy to change later:
 - One personal `user_id` stored in the ChatGPT Project instructions
 - Locale `sv-SE`, timezone `Europe/Stockholm`, ISO week Monday–Sunday (`week_start = 1`)
 - First weekly plan combines only the modalities the user selected
-- Nutrition preferences, body measures, a working `target_kcal`, and a food/recipe library may be stored on the profile; `training-nutrition` turns them into chat suggestions and follow-up, not a persisted weekly menu. BMR/TDEE stay inferences. The target is replaceable after `godkänn`
+- Nutrition preferences, body measures, a working `target_kcal`, and a food/recipe library may be stored on the profile; `training-nutrition` turns them into chat suggestions and follow-up, not a persisted weekly menu. Optional `kcal` / `protein_g` live on `food_logged`, not on the profile. BMR/TDEE stay inferences. The target is replaceable after `godkänn`. No protein target on the profile
 - `recommendations` exists but is unused in the first vertical
 - Schema changes go through SQL files in this repo, not ad-hoc DDL in chat

@@ -1,6 +1,6 @@
 # Energy
 
-Compute in chat. Do not store BMR, TDEE, macros, or MET. Store `nutrition.energy.target_kcal` only after `godkänn`, and only when the calorie-target minimum in `docs/data-contracts.md` is confirmed.
+Compute in chat. Do not store BMR, TDEE, macros, MET, or a protein target on the profile. Store `nutrition.energy.target_kcal` only after `godkänn`, and only when the calorie-target minimum in `docs/data-contracts.md` is confirmed. Optional `kcal` / `protein_g` on `food_logged` are meal observations (`*_source` `user | estimated`), not a second target.
 
 ## Clinical flags (local)
 
@@ -59,7 +59,7 @@ Use logged work, not `plans.content`:
 Signals (facts vs unknown vs slutsats):
 
 - Training load this week from `Q_week_events` (logged sessions and activity, not `plans.content`)
-- Meals from `Q_week_food`. Missing days are **unknown intake**, never a confirmed deficit
+- Meals from `Q_week_food`. Missing days are **unknown intake**, never a confirmed deficit. Sum `kcal` only on current meals that have the key; sum `protein_g` the same way. Two incomplete totals; a missing key is unknown, not 0. Do not fill gaps. Do not present the sums as the day’s intake.
 - Weight from `Q_week_weights`: weekly mean of latest-per-date kg if at least two days exist; otherwise only current `data.body.weight_kg`. One point is not a trend
 - Hunger, energy, recovery, performance: their words this turn, or notes they logged. Not a diagnosis
 
@@ -88,5 +88,7 @@ Do not delete or silently rewrite `target_kcal`. Show that weight or the week ch
 ## Do not
 
 - Print BMR/TDEE/macros on ordinary meal **Förslag** unless they asked about energy
-- Store kcal on `food_logged`, `body_weight_logged`, `activity_logged`, `exercise_logged`, or `nutrition.library`
-- Say “du har X kcal kvar”
+- Store kcal or protein on `body_weight_logged`, `activity_logged`, `exercise_logged`, or `nutrition.library`. Optional `kcal` / `protein_g` belong only on `food_logged`
+- Store `target_protein` or other macros on `user_profiles.data`
+- Say “du har X kcal kvar” or remaining protein after a log. Remainder vs `target_kcal` only if they asked
+- Treat a meal-kcal or protein sum as complete day intake, or missing meals as 0

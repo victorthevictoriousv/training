@@ -3,7 +3,8 @@ name: training-nutrition
 description: Give meal suggestions from confirmed nutrition preferences, the
   food/recipe library, and recent training. Use when the user asks what to eat,
   wants lunch/dinner/evening ideas, asks how to fuel a session or recover from
-  one, reports a meal they ate, logs a body weight, wants to save a recipe or
+  one, reports a meal they ate (optional kcal and protein on that log), logs a
+  body weight, wants to save a recipe or
   food staple from a suggestion, asks how diet is going, wants the calorie
   target reviewed against training and food, mentions a food reaction, asks
   about saved nutrition preferences, or wants to list or fetch saved recipes
@@ -20,7 +21,7 @@ description: Give meal suggestions from confirmed nutrition preferences, the
 
 # training-nutrition
 
-Give meal suggestions in chat. Log meals and weigh-ins they report. Review diet against training and food. Save library items and an adjusted `target_kcal` after approval.
+Give meal suggestions in chat. Log meals and weigh-ins they report. Optional `kcal` and `protein_g` on the meal (stated or estimated). Review diet against training and food. Save library items and an adjusted `target_kcal` after approval.
 
 ## Do not
 
@@ -30,11 +31,12 @@ Give meal suggestions in chat. Log meals and weigh-ins they report. Review diet 
 - Log exercises, sessions, or extra-plan activity — hand off to `training-log-and-review`
 - Open `training-plan`, `training-log-and-review`, or their `references/`. Training load is listed `Q_*` only (`Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_week_events`). Never `Q_pr`, `Q_last_working`, `Q_recent_working`, `Q_lazy_activate_candidate`
 - Diagnose a food reaction, allergy, or condition; give clinical or medically restrictive diets
-- Store BMR, TDEE, macros, or MET anywhere
+- Store BMR, TDEE, macros, or MET on the profile, library, gym logs, activity, or weigh-ins. Optional `kcal` / `protein_g` belong only on `food_logged`. No `target_protein`
+- Write `kcal` or `protein_g` on `exercise_logged`, `activity_logged`, `body_weight_logged`, or `nutrition.library`
 - Write `recommendations` or `plans`
 - Change `safety_status` for a nutrition disclosure
 - Give a tailored suggestion if `safety_status` is `stop` or `unknown` (ordinary generic food is allowed when `stop` so they can eat; do not use training logs or a calorie target)
-- Nag them to log meals or weigh-ins. Do not say remaining kcal
+- Nag them to log meals or weigh-ins. Do not say remaining kcal or remaining protein after a log
 
 ## Intent
 
@@ -116,15 +118,29 @@ Note it as their observation, not a diagnosis. If they want it remembered, hand 
 
 ### 4. Log a meal
 
-A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Same instance rules as `activity_logged`; `slot` plays `activity_key`'s role. Do not invent a second variant. Ambiguous match → ask once, do not write (same as gym logs).
+A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Same instance rules as `activity_logged`; `slot` plays `activity_key`'s role. Do not invent a second variant. Ambiguous match → ask once, do not write (same as gym logs). Ask once only for slot, name clash, or bare `nej` after an estimated echo — never “och kalorier?”.
 
 - Run `Q_today_food` for that date (default today in `Europe/Stockholm`).
 - New bout: `instance` = one more than today's max for that `slot` (start at 1).
 - `nej` / `rättelse` keeps the latest `instance` for that slot.
 - Named library item with no extra detail: copy `name` / `library_key` from `nutrition.library`, echo `(enligt vana)`. If that name matches more than one library item, ask once.
 - Slot unclear (no meal time in the message, and the library item has more than one `slots` value, or none) → ask once. A clear slot in the message wins (`lunch var linsgryta` writes even when it is not in the library).
-- `INSERT` `food_logged` (`source = user`, `source_status = confirmed`). Echo **Sparat:**. No second `godkänn`.
-- Do not store kcal. Do not nag. Do not summarise remaining energy unless they asked (“vad åt jag idag?”).
+- A bare day total without a slot (`åt 2400 kcal idag`) is not a day-level event. Ask once which meal.
+- Optional numbers on this payload only: `kcal` + `kcal_source`, `protein_g` + `protein_source` (`user | estimated`). Independent omit — if a number is absent, omit both keys for that number. Not `null`, not `0` as unknown. Do not write carbs, fat, or these keys on gym logs or the library. Portion estimate is food knowledge here; do not open `energy.md`.
+- Numbers they stated: store as said, `*_source = user`. Do **not** invent the other number.
+- Concrete vs unclear (no numbers). **Estimate both** only when you can name the dish or its main foods without inventing a recipe: library match (`enligt vana`); a named composed dish (kycklingris, keso pita); a stated portion of a known food (200 g kyckling). Round kcal to 50, `protein_g` to 5. `*_source = estimated`. **Omit both** when contents or portion are unknown: rester, något, snacks, “åt lunch” with no dish; an unspecified mix (`drack en smoothie`, en bar, bowl, wrap, något från ICA) unless they named ingredients or it matches the library. If unsure, omit. Do not ask whether to estimate.
+- `INSERT` `food_logged` (`source = user`, `source_status = confirmed`). Echo **Sparat:** one line. No second `godkänn`. Never “protein saknas”.
+  - Both stated: `Sparat: Middag — kycklingris, 650 kcal, 45 g protein.`
+  - Both estimated: `Sparat: Middag — kycklingris, ~650 kcal, ~45 g protein (uppskattat).`
+  - Only one stated: that number only, no guessed pair.
+  - No numbers: meal name only (`Sparat: Lunch — rester.`).
+- After an `(uppskattat)` echo, `nej` is ambiguous (numbers vs whole meal). Do not write until it is clear:
+  - `nej till siffrorna` / `utan uppskattningen` / `skippa kcal` → new row, same instance, **without** the number keys (meal stays).
+  - `nej, 40 g protein` (or another stated number) → that key `user`; leave other numbers as they were.
+  - `nej, det var X` / a different dish → whole-meal correction, same instance (existing rule). Re-apply concrete vs unclear on the new dish.
+  - Bare `nej` / `rättelse` → ask once: siffrorna eller hela måltiden? Then write.
+- Without an estimate, `nej` / `rättelse` is a correction of the whole meal (existing rule).
+- Do not nag. Do not say remaining kcal or remaining protein. “Vad åt jag idag?” lists meals and any stored numbers — not a remainder vs `target_kcal` unless they asked.
 
 ```sql
 insert into events (
@@ -187,9 +203,9 @@ How diet is going. Read training, optional meals, and weights. Draw conclusions.
 2. Run `Q_covering_plan`. No row → say so; you may still use `data.body` and `target_kcal`. Do not invent a training week.
 3. If a covering row exists: `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` with that period.
 4. Swedish card, three layers (`docs/provenance.md`):
-   - **Fakta** — saved `target_kcal`; current `body.weight_kg`; current weigh-ins this week (latest per date); logged sessions/activity; logged meals (slots present, not kcal). Sparse food = unknown intake, not “they under-ate”.
-   - **Fortfarande okänt** — no food logs, fewer than two weigh-ins, no training logs, hunger/energy they have not described.
-   - **Mina slutsatser** — rules in `references/energy.md` (review). At most **one** proposed change (target ±100–200, more carbohydrate around hard sessions, or add a staple). Do not change several things at once.
+   - **Fakta** — saved `target_kcal`; current `body.weight_kg`; current weigh-ins this week (latest per date); logged sessions/activity; logged meals (slots). Two incomplete sums over **current** meals: `kcal` where the key exists, `protein_g` where the key exists. Gaps counted separately. A missing key is unknown, not 0. Sparse food = unknown intake, not “they under-ate”.
+   - **Fortfarande okänt** — no food logs, meals without numbers, fewer than two weigh-ins, no training logs, hunger/energy they have not described.
+   - **Mina slutsatser** — rules in `references/energy.md` (review). Protein vs ~1.6–2.0 g/kg only here, never a stored target. After hard gym: more protein around the session as a suggestion, not “du ligger under”. At most **one** proposed change (target ±100–200, more carbohydrate around hard sessions, or add a staple). Do not change several things at once.
 5. If they `godkänn` a new `target_kcal`: insert `profile_updated`, then `jsonb_set` `nutrition.energy.target_kcal`. Same coalesce pattern as library. Do not write BMR/TDEE.
 
 Do not write `recommendations`. Do not mix this into the training weekly overview (`training-log-and-review` §8).

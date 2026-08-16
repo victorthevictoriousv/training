@@ -49,7 +49,7 @@ Inference (do not save as profile fact):
 | Replacing a queued future `proposed` week | `plan_superseded` on that proposed row, then `plan_proposed` on the new (still not `active`) |
 | Exercise log or weight correction | `exercise_logged` (append; latest wins; PR uses current rows only) |
 | Extra-plan activity or a correction of it | `activity_logged` (append; latest per date + `activity_key` + `instance` wins; new bout vs correction per log-schema) |
-| Meal log or a correction of it | `food_logged` (append; same instance rules as `activity_logged`; `slot` in place of `activity_key`) |
+| Meal log or a correction of it | `food_logged` (append; same instance rules as `activity_logged`; `slot` in place of `activity_key`). Optional `kcal` / `protein_g` use payload `*_source` (`user` vs `estimated`); the event stays `source = user` |
 | Body-weight log or a correction of it | `body_weight_logged` (append; latest per date wins; syncs `data.body.weight_kg`) |
 | Finished or skipped session | `session_completed` or `session_missed` |
 

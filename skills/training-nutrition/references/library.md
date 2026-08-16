@@ -34,7 +34,7 @@ Recipe extras (omit on `staple`):
 - `staple`: frequent meal, short notes, no recipe required
 - `recipe`: ingredients + short Swedish `method` when they say spara receptet
 
-Omit the array until at least one item is confirmed. Do not save `[]`. Do not store kcal, macros, or MET on items. Portion kcal in chat is a slutsats if they ask.
+Omit the array until at least one item is confirmed. Do not save `[]`. Do not store kcal, protein, macros, or MET on items. Portion numbers belong on `food_logged` when they log the meal (`kcal` / `protein_g`, `*_source` `estimated` if you guessed from ingredients or a typical portion).
 
 ## Writes
 
