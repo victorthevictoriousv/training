@@ -4,7 +4,7 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 ## How to run
 
-1. Classify intent with the skill’s intent table. On the show-saved-session or nutrition log / weigh-in / prefs / vanearkivet fast path, skip that and use the ids listed there.
+1. Classify intent with the skill’s intent table. On the show-saved-session, show-saved-schema, or nutrition log / weigh-in / prefs / vanearkivet fast path, skip that and use the ids listed there.
 2. Open this file and copy **only** the listed ids (the groups below are orientation, not extra queries).
 3. Replace `:USER_ID` from Project instructions. Never invent another user.
 4. Replace other `:placeholders` from the skill (`:date` is the session date in `Europe/Stockholm`; `:today` is today’s date there).
@@ -21,13 +21,17 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 **Training draft week:** `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_recent_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events`
 
-**Nutrition day (suggestion):** `Q_profile`, `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_today_food`
+**Nutrition show schema:** `Q_lazy_activate_meal_plan`, `Q_covering_meal_plan`, `Q_queued_next_meal_plan`
 
-**Nutrition week / follow-up:** `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits`
+**Nutrition day (suggestion):** `Q_profile`, `Q_covering_meal_plan`, `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_today_food`
 
-**Nutrition log / prefs / vanearkivet / today list:** `Q_profile`, `Q_today_food`
+**Nutrition week / follow-up / draft schema:** `Q_profile`, `Q_covering_plan`, `Q_covering_meal_plan`, `Q_queued_next_meal_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits`
 
-Nutrition never runs `Q_pr`, `Q_last_working`, `Q_recent_working`, `Q_lazy_activate_candidate`. Training never runs `Q_today_food`, `Q_week_food`, `Q_week_weights` unless the same message also asked about diet.
+**Nutrition log / today list:** `Q_profile`, `Q_today_food`, `Q_covering_meal_plan`
+
+**Nutrition prefs / vanearkivet:** `Q_profile`
+
+Nutrition never runs `Q_pr`, `Q_last_working`, `Q_recent_working`, or `Q_lazy_activate_candidate`. Training never runs `Q_today_food`, `Q_week_food`, `Q_week_weights`, `Q_covering_meal_plan`, `Q_lazy_activate_meal_plan`, or `Q_queued_next_meal_plan` unless the same message also asked about diet.
 
 ---
 
@@ -58,12 +62,39 @@ where user_id = :USER_ID;
 
 ### Q_covering_plan
 
-Plan whose period contains `:date`. Never `status = 'active'` alone.
+Training plan (`kind = training`) whose period contains `:date`. Never `status = 'active'` alone. Never returns a nutrition week.
 
 ```sql
-select id, status, period_start, period_end, version, title, content
+select id, status, period_start, period_end, version, title, content, kind
 from plans
 where user_id = :USER_ID
+  and kind = 'training'
+  and period_start <= :date
+  and period_end >= :date
+  and status in ('active', 'proposed', 'completed', 'superseded')
+order by
+  case status
+    when 'active' then 0
+    when 'proposed' then 1
+    when 'completed' then 2
+    else 3
+  end,
+  activated_at desc nulls last,
+  created_at desc
+limit 1;
+```
+
+---
+
+### Q_covering_meal_plan
+
+Nutrition plan (`kind = nutrition`) whose period contains `:date`. Same status preference as `Q_covering_plan`. Never returns a training week.
+
+```sql
+select id, status, period_start, period_end, version, title, content, kind
+from plans
+where user_id = :USER_ID
+  and kind = 'nutrition'
   and period_start <= :date
   and period_end >= :date
   and status in ('active', 'proposed', 'completed', 'superseded')
@@ -83,12 +114,30 @@ limit 1;
 
 ### Q_queued_next_week
 
-Approved future week, not yet current. `:today` = today in `Europe/Stockholm`.
+Approved future **training** week, not yet current. `:today` = today in `Europe/Stockholm`.
 
 ```sql
-select id, status, period_start, period_end, version, title, content
+select id, status, period_start, period_end, version, title, content, kind
 from plans
 where user_id = :USER_ID
+  and kind = 'training'
+  and status = 'proposed'
+  and period_start > :today
+order by period_start, created_at desc
+limit 1;
+```
+
+---
+
+### Q_queued_next_meal_plan
+
+Approved future **nutrition** week, not yet current. `:today` = today in `Europe/Stockholm`.
+
+```sql
+select id, status, period_start, period_end, version, title, content, kind
+from plans
+where user_id = :USER_ID
+  and kind = 'nutrition'
   and status = 'proposed'
   and period_start > :today
 order by period_start, created_at desc
@@ -99,12 +148,31 @@ limit 1;
 
 ### Q_lazy_activate_candidate
 
-`proposed` week whose period contains `:today`. training-plan reads only. If a row returns, apply the lazy-activate writes in `training-plan` §1 (complete expired `active`, then activate). Do not run from `training-log-and-review`.
+`proposed` **training** week whose period contains `:today`. training-plan reads only. If a row returns, apply the lazy-activate writes in `training-plan` §1 (complete expired `active` training week, then activate). Do not run from `training-log-and-review` or `training-nutrition`.
 
 ```sql
-select id, status, period_start, period_end, version, title, content
+select id, status, period_start, period_end, version, title, content, kind
 from plans
 where user_id = :USER_ID
+  and kind = 'training'
+  and status = 'proposed'
+  and period_start <= :today
+  and period_end >= :today
+order by created_at desc
+limit 1;
+```
+
+---
+
+### Q_lazy_activate_meal_plan
+
+`proposed` **nutrition** week whose period contains `:today`. training-nutrition reads only. If a row returns, apply the lazy-activate writes in `training-nutrition` §9 (complete expired `active` nutrition week, then activate). Do not run from `training-plan` or `training-log-and-review`.
+
+```sql
+select id, status, period_start, period_end, version, title, content, kind
+from plans
+where user_id = :USER_ID
+  and kind = 'nutrition'
   and status = 'proposed'
   and period_start <= :today
   and period_end >= :today
@@ -203,7 +271,7 @@ order by occurred_at desc;
 
 ### Q_week_food
 
-`food_logged` in the covering week. Nutrition follow-up only — not the training weekly overview. `:period_start` / `:period_end` from `Q_covering_plan`. Skip if there is no covering row. Latest per `date + slot + instance` is current (same rules as `Q_today_food`). Optional `kcal` / `protein_g` on the payload; sum only rows that have the key (incomplete totals, never fill gaps with 0).
+`food_logged` in the covering week. Nutrition follow-up only — not the training weekly overview. `:period_start` / `:period_end` from `Q_covering_plan` (training week) or `Q_covering_meal_plan` when following up against the meal schema; same ISO week either way. Skip if there is no covering row. Latest per `date + slot + instance` is current (same rules as `Q_today_food`). Optional `kcal` / `protein_g` on the payload; sum only rows that have the key (incomplete totals, never fill gaps with 0).
 
 ```sql
 select payload, occurred_at

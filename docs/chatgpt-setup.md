@@ -16,14 +16,9 @@ where conrelid = 'events'::regclass
 
 Expected: the definition includes `activity_logged`.
 
-3. [`0004_plan_active_uniqueness.sql`](../supabase/migrations/0004_plan_active_uniqueness.sql) and [`0005_invariants.sql`](../supabase/migrations/0005_invariants.sql) have been applied. Confirm:
+3. [`0004_plan_active_uniqueness.sql`](../supabase/migrations/0004_plan_active_uniqueness.sql) and [`0005_invariants.sql`](../supabase/migrations/0005_invariants.sql) have been applied. Confirm ISO week and the append-only trigger (the original per-user unique indexes are replaced in step 8):
 
 ```sql
-select indexname
-from pg_indexes
-where tablename = 'plans'
-  and indexname in ('plans_one_active_per_user', 'plans_one_proposed_per_user_period');
-
 select conname
 from pg_constraint
 where conrelid = 'plans'::regclass
@@ -35,7 +30,7 @@ where tgrelid = 'events'::regclass
   and tgname = 'events_append_only';
 ```
 
-Expected: both indexes, both constraints, and the append-only trigger.
+Expected: both constraints and the append-only trigger.
 
 4. [`0006_exercise_key_index.sql`](../supabase/migrations/0006_exercise_key_index.sql), [`0007_exercise_prs.sql`](../supabase/migrations/0007_exercise_prs.sql), and [`0008_exercise_prs_safe_date.sql`](../supabase/migrations/0008_exercise_prs_safe_date.sql) have been applied. Confirm:
 
@@ -99,7 +94,32 @@ order by table_name;
 
 Expected: five rows.
 
-8. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
+8. [`0011_plan_kind.sql`](../supabase/migrations/0011_plan_kind.sql) has been applied. Confirm:
+
+```sql
+select column_name, column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'plans'
+  and column_name = 'kind';
+
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'plans'::regclass
+  and conname = 'plans_kind_chk';
+
+select indexname
+from pg_indexes
+where tablename = 'plans'
+  and indexname in (
+    'plans_one_active_per_user_kind',
+    'plans_one_proposed_per_user_kind_period'
+  );
+```
+
+Expected: column `kind` default `'training'`, check `training | nutrition`, both unique indexes. Old indexes `plans_one_active_per_user` and `plans_one_proposed_per_user_period` are gone. Existing rows have `kind = 'training'`.
+
+9. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
 
 `USER_ID` is already set to `815c0d8e-9e76-4dbb-9c89-86a504bb5da0`. Keep it unless you intentionally rotate identity.
 
@@ -116,7 +136,7 @@ Fallback if GitHub is unavailable: upload `docs/` and `skills/` into the Project
 ## 3. ChatGPT Project
 
 1. Create a Project named **träning** (the Swedish UI name). The GitHub repo and product stay `training`.
-2. Paste everything below the line in [`chatgpt-project-instructions.md`](chatgpt-project-instructions.md) into Project instructions. There are no placeholders to replace: GitHub URL, Supabase ref, and `USER_ID` are already filled.
+2. Paste everything below the line in [`chatgpt-project-instructions.md`](chatgpt-project-instructions.md) into Project instructions. There are no placeholders to replace: GitHub URL, Supabase ref, and `USER_ID` are already filled. **This file is not live-read.** After any change to it in the repo, paste the file into the ChatGPT Project again or the fast paths in production stay stale.
 3. Enable the official Supabase app for the project and point it at `eqgfiaqqsmupbvcvcuce`.
 4. Enable the GitHub app and allow `https://github.com/victorthevictoriousv/training`.
 5. Start a new chat inside **träning**.
@@ -186,7 +206,7 @@ After B: `Lägg en veckoplan för nästa vecka.`
 Inspect the Swedish proposal. Then `godkänn`.
 
 ```sql
-select id, status, period_start, period_end, title, content, activated_at
+select id, kind, status, period_start, period_end, title, content, activated_at
 from plans
 where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
 order by created_at;
@@ -200,9 +220,10 @@ order by created_at;
 
 Expected:
 
-- at most one `active` plan; at most one `proposed` future week
+- training rows have `kind = training` (default for existing rows)
+- at most one `active` plan **per `kind`**; at most one `proposed` future week per `kind`
 - `period_start` is a Monday, `period_end` the following Sunday
-- `content.days` only uses modalities you confirmed
+- `content.days` only uses modalities you confirmed (`sessions`, not `meals`)
 - If that Monday is **after today**: the new row is `proposed`, event `plan_proposed` only, `activated_at` is null. No `plan_activated`. An existing current week (if any) stays `active`.
 - If that Monday is **today or earlier**: events `plan_proposed` and `plan_activated` for that `plan_id`, `activated_at` is set, status `active`
 
@@ -291,6 +312,7 @@ Expected: **Förslag (sparas inte än)** with one home alternative and the origi
 select content
 from plans
 where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+  and kind = 'training'
   and period_start <= (now() at time zone 'Europe/Stockholm')::date
   and period_end >= (now() at time zone 'Europe/Stockholm')::date
 order by
@@ -452,13 +474,13 @@ Expected: `data.body` has sex, birth_year, height_cm, weight_kg. `nutrition.ener
 
 Expected: `nutrition.library` has both `kind` values after `godkänn`. Empty array is not stored. Save-from-suggestion does not open `data-contracts.md` / `safety.md`.
 
-3. New chat: meal suggestion tied to today's training (`Vad ska jag äta till middag?` or `Vad ska jag äta efter passet?`).
+3. New chat: meal suggestion tied to today's training (`Vad ska jag äta till middag?` or `Vad ska jag äta efter passet?`), **before** a covering meal plan exists (or they clearly want ideas besides the schema).
 
-Expected: a Swedish **Förslag** card that prefers library items for that slot and references real logged activity (not only the aspirational plan). Opens `training-nutrition` plus gated refs (`meal-suggestions.md`, `library.md`); does **not** open `training-plan`, `training-log-and-review`, `docs/safety.md`, `docs/data-contracts.md`, or `energy.md` unless you asked about energy. Training load via `Q_today_logs` / `Q_today_activity` / `Q_covering_plan` only. Does not print BMR/TDEE unless you asked about energy. `recommendations` unchanged. Without `godkänn`, library unchanged.
+Expected: a Swedish **Förslag** card that prefers library items for that slot and references real logged activity (not only the aspirational plan). Opens `training-nutrition` plus gated refs (`meal-suggestions.md`, `library.md`); does **not** open `training-plan`, `training-log-and-review`, `docs/safety.md`, `docs/data-contracts.md`, or `energy.md` unless you asked about energy. Training load via `Q_today_logs` / `Q_today_activity` / `Q_covering_plan` (plus `Q_covering_meal_plan`, which is empty here). Does not print BMR/TDEE unless you asked about energy. `recommendations` unchanged. Without `godkänn`, library unchanged. If a covering meal plan already exists and they only asked what to eat, that is I.11 (**Sparat schema**), not this card.
 
 4. Log a meal without a second confirmation (`åt kycklingris till middag` or the staple name).
 
-Expected: nutrition fast path (`queries.md` + `Q_today_food`, **Sparat:**). Does not open the four constitution docs, training-skills, `meal-suggestions.md`, or `energy.md`. `event_count` increased by one `food_logged`. Concrete food with no stated numbers: payload has `kcal` and `protein_g` with `*_source = estimated` (kcal rounded to 50, protein to 5). Unclear contents (`åt rester`, `drack en smoothie` with no ingredients): no number keys. A bare day total without a slot (`åt 2400 kcal idag`): ask once which meal, no write. A second lunch the same day is a new `instance`. After an estimated echo, bare `nej` asks once (siffrorna eller hela måltiden?) and does not write; `nej till siffrorna` reuses instance and drops the number keys (meal stays). `nej, 40 g protein` (or another stated number) writes that key as `user` and leaves other numbers — no clarifying question. `nej, det var X` is a whole-meal correction on the same instance (re-apply concrete vs unclear). `nej` / `rättelse` without an estimate also reuses instance. **Sparat:** is one line; no “kcal kvar”.
+Expected: nutrition fast path (`queries.md` + `Q_today_food` + `Q_covering_meal_plan`, **Sparat:**). Does not open the four constitution docs, training-skills, `meal-suggestions.md`, or `energy.md`. `event_count` increased by one `food_logged`. Concrete food with no stated numbers: payload has `kcal` and `protein_g` with `*_source = estimated` (kcal rounded to 50, protein to 5). Unclear contents (`åt rester`, `drack en smoothie` with no ingredients): no number keys. A bare day total without a slot (`åt 2400 kcal idag`): ask once which meal, no write. A second lunch the same day is a new `instance`. After an estimated echo, bare `nej` asks once (siffrorna eller hela måltiden?) and does not write; `nej till siffrorna` reuses instance and drops the number keys (meal stays). `nej, 40 g protein` (or another stated number) writes that key as `user` and leaves other numbers — no clarifying question. `nej, det var X` is a whole-meal correction on the same instance (re-apply concrete vs unclear). `nej` / `rättelse` without an estimate also reuses instance. **Sparat:** is one line; no “kcal kvar”. Eating something else does not `UPDATE` a meal plan.
 
 4b. Stated kcal only (`lunch 700 kcal`).
 
@@ -484,13 +506,38 @@ Expected: opens `training-nutrition` §4 list (`Q_profile` + `Q_today_food`) —
 
 7b. Saved calorie target (`Vad är mitt kalorimål?`): nutrition fast path (`Q_profile` only). Prints confirmed `target_kcal` as a working number, phrased from `nutrition.goal` (`improve_performance` → sikta mot minst {n}, not “håll dig under”). Does not open `energy.md` or constitution docs.
 
-8. Follow-up (`hur går kosten?` / `hur ligger jag mot målet?`): opens `training-nutrition` §6 plus `energy.md`, `docs/autonomy.md`, and `docs/provenance.md` — not `data-contracts.md` / `safety.md`, not the log skill’s weekly overview. Swedish facts / unknown / slutsats over the covering week’s training (`Q_week_events`), meals (`Q_week_food`), and weights (`Q_week_weights`). Sparse food is unknown, not a deficit. Optional meal `kcal` / `protein_g` are two incomplete sums (missing key ≠ 0). Slot line vs `kitchen.meals`. Incomplete kcal sum vs `target_kcal` uses goal language (`improve_performance` → `av minst ~2600 (ofullständigt — …)`; `lose_weight` must not say “minst”). No “kcal kvar”. No auto-write of `target_kcal`. After `godkänn` of a proposed change, only that integer updates.
+8. Follow-up (`hur går kosten?` / `hur ligger jag mot målet?`): opens `training-nutrition` §6 plus `energy.md`, `docs/autonomy.md`, and `docs/provenance.md` — not `data-contracts.md` / `safety.md`, not the log skill’s weekly overview. Swedish facts / unknown / slutsats over the covering week’s training (`Q_week_events`), meals (`Q_week_food`), and weights (`Q_week_weights`), plus planerat vs loggat from `Q_covering_meal_plan` when a schema exists (missing log = okänt, not a miss). Sparse food is unknown, not a deficit. Optional meal `kcal` / `protein_g` are two incomplete sums (missing key ≠ 0). Slot line vs `kitchen.meals`. Incomplete kcal sum vs `target_kcal` uses goal language (`improve_performance` → `av minst ~2600 (ofullständigt — …)`; `lose_weight` must not say “minst”). No “kcal kvar”. No auto-write of `target_kcal`. After `godkänn` of a proposed change, only that integer updates.
 
 9. Eating-disorder (or clinician diet / insulin-diabetes) disclosure while asking for a calorie target: refuses `target_kcal`; `safety_status` and the training plan unchanged.
 
 10. New chat: list then fetch (`Mina recept` then `2` or `hämta keso pita`).
 
 Expected: nutrition fast path (`Q_profile` only). First reply is **Vanearkivet · recept** — numbered index of recipes only (no **Vanor** heading, no staples), no ingredients. A number continues in that filtered set; `hämta keso pita` is one **Sparat recept** card (ingredients + method + tips) if that name is a recipe. Does not open constitution docs, training-skills, `meal-suggestions.md`, or `energy.md`. `recommendations` and `nutrition.library` unchanged. Empty library: says so, does not invent. Offer once to add.
+
+11. Weekly meal schema (`Gör ett kostschema för nästa vecka` or `lägg en matvecka`). Kitchen extras missing → onboarding §3d first (profilfakta vs “gäller bara den här veckan”). Then **Förslag (sparas inte än)**, not bare **Förslag**. Without `godkänn`: no new `plans` row with `kind = nutrition`. After `godkänn`:
+
+```sql
+select id, kind, status, period_start, period_end, title, content
+from plans
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+  and kind = 'nutrition'
+order by created_at desc
+limit 2;
+```
+
+Expected: `kind = nutrition`; `content.days` has seven dates and `meals` (not `sessions`); slots match `kitchen.meals`; some meals have `alternatives`; no kcal on meals. Future week stays `proposed` while a training week for this ISO week can stay `active`. Current training `active` row unchanged.
+
+Then new chat: `Vad ska jag äta på onsdag?` (no change). Expected: show-saved-schema fast path (`Q_lazy_activate_meal_plan`, `Q_covering_meal_plan`); **Sparat schema**; no `Q_today_logs`; does not open `meal-suggestions.md`.
+
+Then: `Byt lunch på onsdag.` Expected: **Förslag (sparas inte än)** using `alternatives[0]` first. After `godkänn`, that slot’s `name` / `library_key` is the former alternative. `leftover_from` pointing at it is updated in the same write.
+
+Then: `Åt enligt schema` for a planned slot. Expected: `food_logged` with that `library_key` / `name`; schema `content` unchanged.
+
+Then: `Åt pizza till lunch` (or another dish that is not the planned one). Expected: `food_logged` for pizza; meal plan `content` still the swapped/planned name, not pizza.
+
+### J. Paste project instructions
+
+After the repo changes in this file: open the ChatGPT Project **träning** and paste everything below the line in [`chatgpt-project-instructions.md`](chatgpt-project-instructions.md) again. The Project does not live-read the GitHub file. Skip this and the show-saved-schema fast path in production still behaves as the previous paste.
 
 ## 5. What you cannot verify from this repo alone
 

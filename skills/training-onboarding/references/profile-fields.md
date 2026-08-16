@@ -28,6 +28,19 @@ Confirmed fields only in `user_profiles.data`. Paths below are also `provenance`
 
 Allergies are asked; confirmed empty `nutrition.allergies` is enough. Kitchen and library are optional. Clinical nutrition flags refuse this write without changing `safety_status`.
 
+## Minimum for a meal week
+
+`training-nutrition` may save `plans.kind = nutrition` only when:
+
+| Path | Required |
+| --- | --- |
+| `safety_status` column | `cleared` or `restricted` |
+| `nutrition.allergies` | yes (empty array with provenance is enough) |
+| `nutrition.kitchen.meals` | non-empty |
+| `nutrition.library` **or** named dishes in the approved draft | at least one |
+
+`target_kcal` and `body.*` are not required. Collect kitchen extras (`time_min_weekend`, `servings`, `lunch_source`, `leftovers`, `eat_out_notes`) here when they want a schema; the week itself is drafted in `training-nutrition`.
+
 ## Field dictionary
 
 ### `goals`
@@ -98,11 +111,11 @@ If they name a drug, set `medications_mentioned: true` and write an `events` obs
 - `allergies`: string array. Confirmed `[]` with provenance means no known allergies
 - `exclusions`: string array
 - `preferences`: string array — free-text notes beyond the structured fields above (e.g. "gillar inte fisk")
-- `kitchen` (optional): `meals` (`breakfast | lunch | dinner | evening | snack`), `time_min` (weekday cooking minutes), `skill` (`beginner | intermediate | advanced`)
+- `kitchen` (optional): `meals` (`breakfast | lunch | dinner | evening | snack`), `time_min` (weekday cooking minutes), `skill` (`beginner | intermediate | advanced`). Optional extras on the same object (provenance `nutrition.kitchen`): `time_min_weekend`, `servings` (how many they cook for), `lunch_source` (`home | packed | work | mixed`), `leftovers` (`often | sometimes | never`), `eat_out_notes` (recurring pattern). Collect extras when they want a weekly meal schema, or when those gaps exist before the first schema draft. This-week context (travel, shift, how strictly they want *this* week) is not saved here. Do not add a kitchen equipment field; reuse `equipment.items` if equipment ever becomes a fact
 - `energy.target_kcal` (optional integer): working daily target after `godkänn`. Never BMR, TDEE, macros, MET, or a protein target on the profile (`target_protein` does not exist). Meal `kcal` / `protein_g` live on `food_logged`, not here. Does not auto-update when weight changes. Follow-up may replace it after a new `godkänn`. Spoken from `nutrition.goal`: floor (`sikta mot minst`) for `improve_performance` / `build_muscle` / `general_health`; riktmärke for `maintain` / `none`; modest deficit for `lose_weight`. No extra tracking field
 - `library` (optional): array of staples and recipes. Provenance key `nutrition.library` for the whole array. See `skills/training-nutrition/references/library.md`
 
-Collect nutrition if offered, or when they say they want to set up diet (`jag vill sätta upp kosten`). Ask once what they often eat (library), same spirit as habits in §3b. `training-onboarding` still owns `body.*`, `nutrition.goal` / pattern / allergies, and `target_kcal`. `training-nutrition` may write `library` after approval in the same turn as a suggestion. Do not generate a weekly menu here.
+Collect nutrition if offered, or when they say they want to set up diet (`jag vill sätta upp kosten`). Ask once what they often eat (library), same spirit as habits in §3b. `training-onboarding` still owns `body.*`, `nutrition.goal` / pattern / allergies, `kitchen`, and `target_kcal`. `training-nutrition` may write `library` after approval in the same turn as a suggestion, and owns weekly meal schemas (`plans.kind = nutrition`). Do not generate a weekly menu here — hand off to `training-nutrition`.
 
 ### `recovery` / `life` (optional)
 
@@ -144,7 +157,7 @@ Use this when the user asks what you still need.
 | --- | --- |
 | Better programming | `experience.*` for selected modalities, `availability.windows`, `availability.two_a_day`, `equipment.items`, `health.injuries`, `lifestyle.habits`, `recovery.sleep_hours` / `recovery.stress` |
 | Logging / review (later) | nothing required in v1 |
-| Nutrition | `nutrition.goal`, `nutrition.dietary_pattern`, `nutrition.allergies`, `nutrition.exclusions`, `nutrition.preferences`, `nutrition.kitchen`, `nutrition.energy.target_kcal`, `nutrition.library`, `body.sex`, `body.birth_year`, `body.height_cm`, `body.weight_kg`, `lifestyle.habits` |
+| Nutrition | `nutrition.goal`, `nutrition.dietary_pattern`, `nutrition.allergies`, `nutrition.exclusions`, `nutrition.preferences`, `nutrition.kitchen` (including optional `time_min_weekend`, `servings`, `lunch_source`, `leftovers`, `eat_out_notes`), `nutrition.energy.target_kcal`, `nutrition.library`, `body.sex`, `body.birth_year`, `body.height_cm`, `body.weight_kg`, `lifestyle.habits` |
 
 ## Provenance entry
 

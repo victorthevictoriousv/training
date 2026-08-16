@@ -49,17 +49,18 @@ One row per user. `user_id` is unique.
 | `supersedes_plan_id` | `uuid` null | Previous plan, if any |
 | `title` | `text` | User-facing, Swedish |
 | `intent` | `text` | User-facing, Swedish |
-| `content` | `jsonb` not null | Days and sessions |
+| `content` | `jsonb` not null | Training: days and sessions. Nutrition: days and meals |
+| `kind` | `text` not null | `training \| nutrition`. Default `training` (existing rows) |
 | `created_at` | `timestamptz` not null | |
 | `activated_at` | `timestamptz` | Set when status becomes `active` |
 | `archived_at` | `timestamptz` | |
 
-The database refuses a second `active` plan per user (`plans_one_active_per_user`). It also refuses a second `proposed` row for the same `period_start` (`plans_one_proposed_per_user_period`), overlapping `active`/`proposed` periods (`plans_no_overlap_active_proposed`), and non-ISO weeks (`plans_iso_week_chk`: Monday–Sunday). Skills must still lazy-activate on Monday rather than activating a future week at save time.
+The database refuses a second `active` plan per `(user_id, kind)` (`plans_one_active_per_user_kind`). It also refuses a second `proposed` row for the same `(kind, period_start)` (`plans_one_proposed_per_user_kind_period`), overlapping `active`/`proposed` periods **of the same `kind`** (`plans_no_overlap_active_proposed`), and non-ISO weeks (`plans_iso_week_chk`: Monday–Sunday). Skills must still lazy-activate on Monday rather than activating a future week at save time. Filter every covering lookup and write by `kind` so a nutrition week cannot block or supersede a training week.
 
-Lookup is by **date**, not by the `active` row alone: the covering plan is the row whose `period_start`–`period_end` contains the date, preferring `active`, then `proposed`, then `completed`, then `superseded`. A still-running week must stay visible after the next week is saved.
+Lookup is by **date and `kind`**, not by the `active` row alone: the covering plan is the row of that `kind` whose `period_start`–`period_end` contains the date, preferring `active`, then `proposed`, then `completed`, then `superseded`. A still-running week must stay visible after the next week of the same `kind` is saved. Training uses `Q_covering_plan`; nutrition uses `Q_covering_meal_plan`.
 
-- Same-week replacement: supersede the current `active` row, then propose + activate in the same turn.
-- Future week (`period_start` after today): leave the current `active` week in place; insert the new row as `proposed` after approval. Do not activate until that Monday (lazy activate on `training-plan` read: complete the expired week, then activate). A `proposed` row after `godkänn` is the saved next week, not a chat draft.
+- Same-week replacement: supersede the current `active` row **of that `kind`**, then propose + activate in the same turn. Set `kind` on `INSERT`.
+- Future week (`period_start` after today): leave the current `active` week of that `kind` in place; insert the new row as `proposed` after approval. Do not activate until that Monday (lazy activate on read for that `kind`: complete the expired week of that `kind`, then activate). A `proposed` row after `godkänn` is the saved next week, not a chat draft.
 - When an ISO week ends naturally, set it `completed` (not `superseded`). `superseded` means replaced mid-week or replaced as a draft of the same future week.
 
 ### `events`
@@ -198,7 +199,12 @@ Only confirmed fields. Omit keys that are not yet confirmed.
     "kitchen": {
       "meals": ["lunch", "dinner", "evening"],
       "time_min": 30,
-      "skill": "intermediate"
+      "time_min_weekend": 60,
+      "skill": "intermediate",
+      "servings": 2,
+      "lunch_source": "packed",
+      "leftovers": "often",
+      "eat_out_notes": "fredag middag ute"
     },
     "energy": {
       "target_kcal": 2800
@@ -270,7 +276,7 @@ Field rules:
 - `medications_mentioned` is a boolean flag only. Do not store drug names in `data`. If the user mentions medication, record an observation event and never give medication advice
 - `body.sex`: `male | female`. `body.birth_year`: integer year. `body.height_cm`, `body.weight_kg`: numbers. Optional until they want a saved calorie target. Not a diagnosis. Provenance keys are dotted paths (`body.sex`, `body.weight_kg`, …)
 - `nutrition.goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`. `nutrition.dietary_pattern`: `omnivore | vegetarian | vegan | pescatarian | other`. Both are closed enums. `allergies`, `exclusions`, and `preferences` stay string arrays. Optional. Confirmed empty `allergies: []` (with provenance) means no known allergies — do not omit the key to mean that. `lose_weight` may become a modest confirmed deficit in `nutrition.energy.target_kcal` (see energy rules), never a clinical diet. The same integer is spoken as a floor (`sikta mot minst`) for `improve_performance` / `build_muscle` / `general_health`, a riktmärke for `maintain` / `none`, and a modest deficit for `lose_weight` — no extra tracking field
-- `nutrition.kitchen` is optional. `meals`: array of `breakfast | lunch | dinner | evening | snack`. `time_min`: weekday cooking minutes. `skill`: `beginner | intermediate | advanced`
+- `nutrition.kitchen` is optional. `meals`: array of `breakfast | lunch | dinner | evening | snack`. `time_min`: weekday cooking minutes. `skill`: `beginner | intermediate | advanced`. Optional extras (confirmed with the kitchen object, provenance `nutrition.kitchen`): `time_min_weekend` (integer), `servings` (how many they cook for), `lunch_source` (`home | packed | work | mixed`), `leftovers` (`often | sometimes | never`), `eat_out_notes` (short recurring pattern, e.g. Friday dinner out). Do not store a kitchen equipment array — if equipment ever matters as a fact, reuse `equipment.items`. This-week context (travel, shift, how strictly they want *this* week) is not a profile field
 - `nutrition.energy.target_kcal` is an integer daily target, stored only after explicit approval. Never store BMR, TDEE, macros, MET, or a protein target here. Updating `body.weight_kg` does not auto-rewrite `target_kcal`. The target is a working number: replace it after a new `godkänn` when follow-up supports a change. Presentation follows `nutrition.goal` (energy rules). Incomplete meal-kcal sums may be compared to it on follow-up or when they asked; missing meals are unknown, not 0. Never a remainder ticker after a log
 - `nutrition.library` is optional. Confirmed go-to meals and saved recipes. Provenance key is `nutrition.library` for the whole array. Each item: `key` (lowercase snake_case), `name`, `kind` (`staple | recipe`), `slots` (same enum as kitchen meals), `notes`. `recipe` items may also have `time_min`, `servings`, `ingredients` (`name`, optional `amount` / `unit`), `method`. Omit the array until at least one item is confirmed. Do not save `[]`. Do not store kcal, protein, or other macros on library items. Portion numbers belong on `food_logged`, not on the item
 - `modalities` is the set the user wants in weekly plans
@@ -333,6 +339,17 @@ If `safety_status` is `restricted`, the plan must stay conservative and respect 
 
 Allergies are asked; a confirmed empty `nutrition.allergies` array is enough. `nutrition.kitchen` and `nutrition.library` are optional. Clinical nutrition flags (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target) refuse this write without changing `safety_status`.
 
+## Minimum profile for a meal week
+
+`training-nutrition` may save a `kind = nutrition` plan only when all of the following are confirmed:
+
+- `safety_status` is `cleared` or `restricted` (never `stop` or `unknown`)
+- `data.nutrition.allergies` (confirmed empty array is enough)
+- `data.nutrition.kitchen.meals` (non-empty)
+- at least one named dish: confirmed `nutrition.library` **or** named meals in the approved draft
+
+`target_kcal` and `body.*` are not required. If `safety_status` is `restricted`, stay conservative (familiar food; hard-avoid allergies/exclusions). Clinical nutrition flags refuse a calorie target; they do not by themselves block a soft meal schema unless the user asked for a strict clinical diet (refuse that).
+
 ## `plans.content`
 
 ```json
@@ -388,6 +405,41 @@ Block items are intentionally loose in v1:
 
 `name` / `key` is what they do at the routine gym. `preferred` is omitted when it is the same as `name`. Set `key` when a substitution exists so logs can tell home vs first-choice apart. A this-week swap (they want another exercise, not that the gym lacks it) does not add `preferred` and does not write `home_gym_substitutions`.
 
+### `kind = nutrition`
+
+Not `sessions`. Same seven `days` (Monday–Sunday). Each day has `meals` instead of `sessions`. Do not put meals on a training plan or sessions on a nutrition plan.
+
+```json
+{
+  "week_label": "2026-W34",
+  "days": [
+    {
+      "date": "2026-08-17",
+      "weekday": "mon",
+      "meals": [
+        {
+          "id": "m1",
+          "slot": "lunch",
+          "library_key": "chicken_rice_broccoli",
+          "name": "Kyckling, ris, broccoli",
+          "prep": "cook",
+          "alternatives": [{ "library_key": "keso_pita", "name": "Keso pita" }],
+          "notes": ""
+        }
+      ]
+    }
+  ]
+}
+```
+
+- Meal `id` unique within the plan (`m1`, `m2`, …)
+- `slot`: `breakfast | lunch | dinner | evening | snack` (same enum as `nutrition.kitchen.meals`)
+- `prep`: `cook | leftover | packed | eat_out`. `leftover` sets `leftover_from`: `{ "date", "meal_id" }`
+- `library_key`: matching `nutrition.library[].key`, or omit/null for a one-off that week
+- `alternatives`: 0–2 other library items for a cheap swap. Same shape as `{ library_key, name }`
+- No kcal, protein, or macros on the meal. Those live on `food_logged` only
+- Days they do not eat a kitchen slot still appear; that slot is simply absent from `meals`
+
 ## Event payloads (v1)
 
 `safety_screening_completed`
@@ -422,9 +474,12 @@ Block items are intentionally loose in v1:
   "period_start": "2026-08-17",
   "period_end": "2026-08-23",
   "week_label": "2026-W33",
-  "superseded_plan_id": null
+  "superseded_plan_id": null,
+  "kind": "training"
 }
 ```
+
+Optional `kind`: `training | nutrition`. Set it when writing a nutrition week so history is unambiguous. Omit on older training events.
 
 `exercise_logged`
 
@@ -518,6 +573,7 @@ Optional meal log. Same instance rules as `activity_logged` above; `slot` plays 
 - `library_key`: matching confirmed `nutrition.library[].key`, or null for free text
 - `instance`: 1-based bout that day for this `slot`. A second lunch the same day is `2`. Missing on old rows means `1`
 - Store what the user said, or the library item's `name` / notes when they named a staple or recipe with no extra detail. Echo `(enligt vana)` in that case
+- `åt enligt schema` / `vanlig {slot}` with a covering nutrition plan: copy `name` / `library_key` from that date's meal whose `slot` matches (first meal in the slot). Echo `(enligt schema)` when it came from the plan. Eating a different dish is a normal log; do not `UPDATE` the meal plan
 - Optional `kcal` (integer) and `protein_g` (integer). Each has a matching `kcal_source` / `protein_source`: `user | estimated`. The event stays `source = user` (they ate the meal); `*_source` is the source of the *number*
 - Independent omit: kcal without protein and vice versa. If a number is absent, omit **both** keys for that number (`kcal` + `kcal_source`). Do not store `null` or `0` as a stand-in for unknown. `0` is a stated value
 - User-stated numbers: store as said (`kcal_source` / `protein_source` = `user`). Do not invent the other number

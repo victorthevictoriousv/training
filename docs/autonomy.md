@@ -30,27 +30,30 @@ After any write, say what was saved, in Swedish.
 
 ## Plans
 
+Training weeks (`kind = training`) and nutrition weeks (`kind = nutrition`) share the `plans` table. Every covering lookup, lazy-activate, and write is **per `kind`**. An active nutrition week must not block, complete, or supersede a training week, and vice versa.
+
 - Draft a new week in the conversation first.
-- On approval of a **same-week** replacement (`period_start` ≤ today, or the same ISO week as the current `active` plan):
-  1. If another plan is `active`, set it to `superseded`, set `archived_at`, insert `plan_superseded`.
-  2. Insert the new row as `proposed` and insert `plan_proposed`.
+- On approval of a **same-week** replacement (`period_start` ≤ today, or the same ISO week as the current `active` plan of that `kind`):
+  1. If another plan of **that `kind`** is `active`, set it to `superseded`, set `archived_at`, insert `plan_superseded`.
+  2. Insert the new row as `proposed` (set `kind`) and insert `plan_proposed`.
   3. Update that row to `active`, set `activated_at`, insert `plan_activated`.
 - On approval of a **future** week (`period_start` > today):
-  1. Do not supersede an `active` plan whose `period_end` is still today or later.
-  2. If a `proposed` row already exists for that same `period_start`, supersede **that** row, then insert the new one.
+  1. Do not supersede an `active` plan of that `kind` whose `period_end` is still today or later.
+  2. If a `proposed` row of that `kind` already exists for that same `period_start`, supersede **that** row, then insert the new one.
   3. Insert the new row as `proposed` and insert `plan_proposed`. Do not activate in the same turn. A `proposed` row after `godkänn` is the saved next week, not a chat draft.
-- Lazy activate on plan read in `training-plan`: if a `proposed` plan’s period contains today, set the expired `active` week (`period_end` < today) to `completed` and activate the new row **only if no other plan is still `active`**. Run both updates and the event insert in one SQL call. If activate matches 0 rows, leave the proposed row and show the covering plan. Do not supersede a still-running week to force it. No cron.
-- Keep at most one `active` plan (the database rejects a second `active` row). At most one `proposed` row per `period_start`. `active` and `proposed` periods must not overlap. Chat drafts stay in the conversation until approval.
+- Lazy activate on plan read: if a `proposed` plan of that `kind` has a period that contains today, set the expired `active` week **of that `kind`** (`period_end` < today) to `completed` and activate the new row **only if no other plan of that `kind` is still `active`**. `training-plan` uses `kind = training`; `training-nutrition` uses `kind = nutrition`. Run both updates and the event insert in one SQL call. If activate matches 0 rows, leave the proposed row and show the covering plan. Do not supersede a still-running week to force it. No cron.
+- Keep at most one `active` plan **per `kind`** (the database rejects a second `active` row for the same `user_id` + `kind`). At most one `proposed` row per `(kind, period_start)`. `active` and `proposed` periods of the same `kind` must not overlap. Chat drafts stay in the conversation until approval.
 
 ## Presenting a saved session
 
-- Always `SELECT` the **covering plan for that date** (`period_start` ≤ date ≤ `period_end`, prefer `active` then `proposed` then `completed` then `superseded`). Do not use `status = 'active'` alone.
-- Show only what is stored in that plan’s `plans.content` for that date. Label it **Sparat pass**. Background habits and unplanned `activity_logged` are not sessions. Scheduled habit sessions that exist in `content` are **Sparat pass**.
+- Always `SELECT` the **covering plan for that date and `kind`** (`period_start` ≤ date ≤ `period_end`, prefer `active` then `proposed` then `completed` then `superseded`). Training: `Q_covering_plan` (`kind = training`). Nutrition: `Q_covering_meal_plan` (`kind = nutrition`). Do not use `status = 'active'` alone.
+- Training: show only what is stored in that plan’s `plans.content` for that date. Label it **Sparat pass**. Background habits and unplanned `activity_logged` are not sessions. Scheduled habit sessions that exist in `content` are **Sparat pass**.
+- Nutrition: show only `content.days[].meals` for that date. Label it **Sparat schema**. Do not treat a skipped meal as `session_missed`.
 - If a strength item has `preferred`, show the prescribed `name` as the work, then **Förstahand (annat gym):** and `preferred.name`. Cue last working load for `name` by default.
-- If the read fails: say so. Never generate a stand-in workout.
-- If no covering plan exists for that date: there is no saved plan for that date. Do not call it a rest day.
-- If that date exists in `content.days` and has no sessions: it is a rest day in the saved plan. Do not fill it in unless the user asks to add something, and then wait for approval before writing.
-- “This week” is the covering plan for **today**. A queued `proposed` next week must not hide remaining days of the current week.
+- If the read fails: say so. Never generate a stand-in workout or meal week.
+- If no covering plan of that `kind` exists for that date: there is no saved plan for that date. Do not call it a rest day.
+- If that date exists in `content.days` and has no sessions (training) or no meals (nutrition): rest / no planned meals that day in the saved plan. Do not fill it in unless the user asks to add something, and then wait for approval before writing.
+- “This week” is the covering plan of that `kind` for **today**. A queued `proposed` next week of that `kind` must not hide remaining days of the current week.
 
 ## Changing a saved session
 
@@ -87,7 +90,7 @@ Read context. Do not require exact wording. Examples below are illustrations, no
 - Explicit lines like `bänk 80x5` → `INSERT` `exercise_logged` (`source = user`, `source_status = confirmed`) and echo **Sparat:**
 - Correction (`bänk 82.5`) → another `exercise_logged`. Latest for that date + `exercise_key` is current. Never UPDATE events.
 - Extra-plan activity (`gick 30 min`, `gåband`, `gåband 60 min 5 km/h`, `klättrade 2h`) → `INSERT` `activity_logged` and echo **Sparat:**. A second `gåband` the same day is a new instance, not a correction, unless they say `nej` / `rättelse`. Bare `gåband` uses the habit typicals and echoes `(enligt vana)`. If it matches a scheduled habit session that day (`habit_key` on the session), also `session_completed` and set `plan_id` / `session_id` on the activity. Otherwise `plan_id` is null and do not write `session_completed`.
-- Optional meal log (`åt kycklingris till middag`, `vanlig lunch`) → `INSERT` `food_logged` in `training-nutrition` and echo **Sparat:**. Reuse the `activity_logged` instance rules in this file and in `docs/data-contracts.md`; `slot` plays `activity_key`'s role. Do not invent a second variant. Bare library name fills from `nutrition.library` (`enligt vana`). Optional `kcal` / `protein_g` with `*_source` `user | estimated` (stated numbers, or both estimated when the dish or main foods are known; omit when contents are unknown). Do not invent the other number if they stated only one. After an estimated echo, bare `nej` is ambiguous — ask once (siffrorna eller hela måltiden?). Do not nag if they skip logging. Do not ask “och kalorier?”. Gym logs and library items still have no kcal or protein.
+- Optional meal log (`åt kycklingris till middag`, `vanlig lunch`, `åt enligt schema`) → `INSERT` `food_logged` in `training-nutrition` and echo **Sparat:**. Reuse the `activity_logged` instance rules in this file and in `docs/data-contracts.md`; `slot` plays `activity_key`'s role. Do not invent a second variant. Bare library name fills from `nutrition.library` (`enligt vana`). `åt enligt schema` / `vanlig {slot}` fills from the covering nutrition plan’s meal for that date + slot when present (`enligt schema`). Optional `kcal` / `protein_g` with `*_source` `user | estimated` (stated numbers, or both estimated when the dish or main foods are known; omit when contents are unknown). Do not invent the other number if they stated only one. After an estimated echo, bare `nej` is ambiguous — ask once (siffrorna eller hela måltiden?). Do not nag if they skip logging. Do not ask “och kalorier?”. Do not rewrite the meal plan because they ate something else. Gym logs and library items still have no kcal or protein.
 - Optional weigh-in (`väger 88,6`) → `INSERT` `body_weight_logged` in `training-nutrition`, sync `data.body.weight_kg`, echo **Sparat:**. Latest per date wins. Do not rewrite `target_kcal`. Do not nag.
 - Recurring food staples and recipes (`lägg till matvana`, `spara receptet`) are profile **library** items (`nutrition.library`). Propose, wait for approval, then write via onboarding — or via `training-nutrition` in the same turn as a meal suggestion (same exception as gym-unavailable writing `home_gym_substitutions`). A single meal instance is still `food_logged` without a second `godkänn`.
 - `nutrition.energy.target_kcal` is a profile fact only after `godkänn`. It is a working number: follow-up may propose a replacement; never auto-rewrite from weight or TDEE. BMR/TDEE stay labelled inferences. How the number is spoken follows `nutrition.goal` (floor / riktmärke / modest deficit). Gaps in food logs are unknown, not a miss vs the target.

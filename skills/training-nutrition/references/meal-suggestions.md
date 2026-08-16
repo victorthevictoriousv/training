@@ -1,6 +1,6 @@
 # Meal suggestions
 
-Chat suggestions are **Förslag**. They are not a saved weekly menu. Do not write `recommendations` or `plans`. Library saves and `food_logged` are the only writes, and only per `SKILL.md`.
+Chat suggestions are **Förslag**. They are not a saved weekly menu. A saved week is `plans.kind = nutrition` after `godkänn`, labelled **Sparat schema**. Do not write `recommendations` or training plans. Library saves, `food_logged`, and nutrition-week writes (this skill §10–12) are the only writes, and only per `SKILL.md`.
 
 ## Never
 
@@ -12,6 +12,7 @@ Chat suggestions are **Förslag**. They are not a saved weekly menu. Do not writ
 - Change `safety_status` for a nutrition disclosure.
 - Give a tailored suggestion if `safety_status` is `stop` or `unknown`.
 - Nag meal logging or print remaining kcal or remaining protein.
+- Present a chat **Förslag** as if it were **Sparat schema**. If `Q_covering_meal_plan` has a row and they only asked what to eat, that is the saved schema path — not this file.
 
 ## Tie to real activity
 
@@ -37,7 +38,7 @@ Read confirmed `data.nutrition` and `data.body` from `Q_profile`. Omit means unk
 | `allergies` | Hard avoid. Do not suggest those foods. Confirmed `[]` means none known |
 | `exclusions` | Hard avoid (dislike, ethics, religion — their words). |
 | `preferences` | Free-text notes beyond the enums (e.g. “gillar inte fisk”). |
-| `kitchen` | Prefer meals they actually eat and `time_min` / `skill` when present |
+| `kitchen` | Prefer meals they actually eat and `time_min` / `skill` / `time_min_weekend` / `servings` / `lunch_source` / `leftovers` when present. Do not invent a kitchen equipment field |
 | `energy.target_kcal` | Mention only if saved and they asked about amount/energy, with that same goal language |
 | `library` | First source of options for the slot |
 
@@ -54,7 +55,10 @@ SQL lives in `skills/_shared/queries.md`. Copy the named id; do not paste a vari
 | Need | Id |
 | --- | --- |
 | Safety gate, `nutrition.*`, `body`, library | `Q_profile` |
-| Covering week / today’s planned sessions (context only) | `Q_covering_plan` |
+| Covering training week / today’s planned sessions (context only) | `Q_covering_plan` |
+| Covering meal week / today’s planned meals | `Q_covering_meal_plan` |
+| Lazy-activate nutrition week (schema show / draft) | `Q_lazy_activate_meal_plan` |
+| Queued next nutrition week | `Q_queued_next_meal_plan` |
 | What they lifted or ran today | `Q_today_logs` |
 | Extra-plan activity today | `Q_today_activity` |
 | Meals already logged today | `Q_today_food` |

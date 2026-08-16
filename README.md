@@ -13,7 +13,7 @@ v1 is a ChatGPT Project that:
 - confirms facts with the user before saving profile and plan drafts
 - logs explicit exercise lines, extra-plan activity, and optional meals without a second confirmation (optional kcal and protein on the meal, user-stated or estimated)
 - creates a first weekly plan only after the profile is confirmed
-- gives meal suggestions from confirmed nutrition preferences and a food/recipe library (no persisted weekly menu); may save a confirmed daily calorie target (spoken from `nutrition.goal`: floor, riktmärke, or modest deficit)
+- gives meal suggestions from confirmed nutrition preferences and a food/recipe library; may save a weekly meal schema (`plans.kind = nutrition`) after approval; may save a confirmed daily calorie target (spoken from `nutrition.goal`: floor, riktmärke, or modest deficit)
 
 v1 is not a web app, not a custom backend, and not a custom MCP server.
 
@@ -21,8 +21,9 @@ The first complete vertical is:
 
 1. Onboarding with safety screening
 2. A confirmed profile in `user_profiles`
-3. A proposed then activated weekly plan in `plans`
-4. Append-only `events` for those writes
+3. A proposed then activated weekly **training** plan in `plans` (`kind = training`)
+4. An optional proposed then activated weekly **meal schema** in `plans` (`kind = nutrition`)
+5. Append-only `events` for those writes
 
 ## Repository layout
 
@@ -39,20 +40,21 @@ supabase/migrations/   Versioned Postgres schema
 | [docs/chatgpt-project-instructions.md](docs/chatgpt-project-instructions.md) | Paste into the ChatGPT Project named **träning** |
 | [docs/data-contracts.md](docs/data-contracts.md) | Tables, JSON payloads, provenance |
 | [skills/training-onboarding/](skills/training-onboarding/) | Collect and confirm the profile |
-| [skills/training-plan/](skills/training-plan/) | Create, show, and change the weekly plan |
+| [skills/training-plan/](skills/training-plan/) | Create, show, and change the weekly **training** plan (`kind = training`) |
 | [skills/training-log-and-review/](skills/training-log-and-review/) | Log sets, loads, extra-plan activity, and completed or missed sessions |
-| [skills/training-nutrition/](skills/training-nutrition/) | Meal suggestions, optional food and weight logs (optional kcal/protein on the meal), follow-up, library saves after approval |
+| [skills/training-nutrition/](skills/training-nutrition/) | Meal suggestions, weekly meal schema (`kind = nutrition`), optional food and weight logs (optional kcal/protein on the meal), follow-up, library saves after approval |
 | [skills/_shared/queries.md](skills/_shared/queries.md) | Named `SELECT`s (`Q_*`). Skills name an id; they do not paste SQL |
 | [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) | Initial schema |
 | [supabase/migrations/0002_rls_and_log_events.sql](supabase/migrations/0002_rls_and_log_events.sql) | RLS enabled; `exercise_logged`, `session_completed`, `session_missed` event types |
 | [supabase/migrations/0003_activity_logged.sql](supabase/migrations/0003_activity_logged.sql) | `activity_logged` event type |
-| [supabase/migrations/0004_plan_active_uniqueness.sql](supabase/migrations/0004_plan_active_uniqueness.sql) | DB-level guard: at most one `active` plan per user |
-| [supabase/migrations/0005_invariants.sql](supabase/migrations/0005_invariants.sql) | Append-only `events`; ISO week; one `proposed` per period; no overlapping `active`/`proposed` |
+| [supabase/migrations/0004_plan_active_uniqueness.sql](supabase/migrations/0004_plan_active_uniqueness.sql) | Original guard: at most one `active` plan per user (replaced per-kind in 0011) |
+| [supabase/migrations/0005_invariants.sql](supabase/migrations/0005_invariants.sql) | Append-only `events`; ISO week; one `proposed` per period; no overlapping `active`/`proposed` (overlap/proposed uniqueness become per-kind in 0011) |
 | [supabase/migrations/0006_exercise_key_index.sql](supabase/migrations/0006_exercise_key_index.sql) | Index on `exercise_logged` `exercise_key` for last-working scans |
 | [supabase/migrations/0007_exercise_prs.sql](supabase/migrations/0007_exercise_prs.sql) | `exercise_prs` table; trigger recomputes current-log PRs |
 | [supabase/migrations/0008_exercise_prs_safe_date.sql](supabase/migrations/0008_exercise_prs_safe_date.sql) | Safe date cast in the PR recompute so a bad log date cannot abort `events` insert |
 | [supabase/migrations/0009_food_logged.sql](supabase/migrations/0009_food_logged.sql) | `food_logged` event type; partial date index |
 | [supabase/migrations/0010_body_weight_logged.sql](supabase/migrations/0010_body_weight_logged.sql) | `body_weight_logged` event type; partial date index |
+| [supabase/migrations/0011_plan_kind.sql](supabase/migrations/0011_plan_kind.sql) | `plans.kind` (`training \| nutrition`); uniqueness and overlap per `(user_id, kind)` |
 
 ## Language
 

@@ -1,6 +1,6 @@
 # Plan schema
 
-`plans.content` JSON for one ISO week.
+`plans.content` JSON for one ISO week (`kind = training`). Nutrition weeks are `skills/training-nutrition/references/meal-plan-schema.md`.
 
 ```json
 {

@@ -2,7 +2,7 @@
 
 Confirmed go-to meals and saved recipes in `user_profiles.data.nutrition.library`. Provenance key: `nutrition.library` for the whole array. Same add/change/remove pattern as `lifestyle.habits`.
 
-Nothing here is a weekly menu. Suggestions pick from this list; they do not write `plans`.
+Nothing here is a weekly menu. Suggestions and meal-week drafts pick from this list. The saved week is `plans.kind = nutrition`, not this array.
 
 ## Shape
 

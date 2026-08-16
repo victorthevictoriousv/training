@@ -1,5 +1,5 @@
 ---
-description: Named Q_* reads skip the generic Supabase skill; training show-saved-session and nutrition log/weigh-in/prefs/vanearkivet are fast paths
+description: Named Q_* reads skip the generic Supabase skill; training show-saved-session, nutrition show-saved-schema, and nutrition log/weigh-in/prefs/vanearkivet are fast paths
 alwaysApply: true
 ---
 
@@ -16,17 +16,31 @@ When the user only wants to **see** today / tomorrow / a named day / this week /
 
 If they then ask to change the plan or draft a week, load `skills/training-plan/SKILL.md` and follow its intent-gated reads.
 
+## Nutrition — show saved schema
+
+Keep the no-covering-plan line in lockstep with `docs/chatgpt-project-instructions.md` (**Fast path — show saved schema** step 8 and **Saved meal schema** hard-rule step 5): §2 **Förslag**, offer once to göra ett kostschema. Do not extract a shared procedure yet.
+
+When the user only wants to **see** planned meals for today / tomorrow / a named day / this week / “vad ska jag äta” (no change, no new week, no log, no “hur går kosten”). No fuel lookup. No `Q_today_logs`:
+
+1. Open `skills/_shared/queries.md` only.
+2. Call `execute_sql` with `Q_lazy_activate_meal_plan`, then `Q_covering_meal_plan` (plus `Q_queued_next_meal_plan` for “this week”). Filter every statement on `USER_ID`.
+3. If lazy-activate returns a row, open `skills/training-nutrition/SKILL.md` §9 for those writes only. Otherwise do not open that skill yet.
+4. If a covering meal plan exists: present **Sparat schema** from `content.days[].meals` for that date. Stop.
+5. If none exists: load `skills/training-nutrition/SKILL.md` §2 (chat **Förslag**). Offer once to göra ett kostschema.
+
+If they then ask to change a slot, draft a week, or want ideas besides the schema, load `skills/training-nutrition/SKILL.md` and follow its intent-gated reads.
+
 ## Nutrition — log, weigh-in, saved prefs, vanearkivet
 
-When the user only reports a meal they ate (`åt X`, `vanlig lunch`), a weigh-in (`väger 88,6`), asks what nutrition preferences / calorie target are saved, or wants to **list or fetch** the food library (`mina recept`, `vanearkivet`, `hämta keso pita`, a number after a list) — **no** meal suggestion, **no** “hur går kosten”, **no** “vad åt jag idag?”, **no** save-recipe, **no** first-time diet setup. A bare library name with no verb (`Keso pita`) follows §8 Bare name (ask once if unclear) — not an automatic meal log:
+When the user only reports a meal they ate (`åt X`, `vanlig lunch`, `åt enligt schema`), a weigh-in (`väger 88,6`), asks what nutrition preferences / calorie target are saved, or wants to **list or fetch** the food library (`mina recept`, `vanearkivet`, `hämta keso pita`, a number after a list) — **no** meal suggestion, **no** “hur går kosten”, **no** “vad åt jag idag?”, **no** save-recipe, **no** first-time diet setup. A bare library name with no verb (`Keso pita`) follows §8 Bare name (ask once if unclear) — not an automatic meal log:
 
 1. Open `skills/_shared/queries.md` only. Do not open `training-nutrition` except the §4 / §7 SQL or §8 presentation if needed.
-2. Meal: `Q_today_food` (and `Q_profile` if named library / `enligt vana`). Copy the `INSERT` from `skills/training-nutrition/SKILL.md` §4 if the SQL is not already in context — ignore that skill’s Before you start list. Optional `kcal` / `protein_g` here (do not open `energy.md` or the rest of the skill): stated numbers → `user`, do not invent the other; estimate both only when the dish or main foods are known (library, named dish, stated portion); omit both when contents are unknown (`rester`, `drack en smoothie` without ingredients) or you are unsure; a bare day total without a slot (`åt 2400 kcal idag`) → ask once which meal, do not write. After an `(uppskattat)` echo: bare `nej` → ask once (siffrorna eller hela måltiden?), do not write; `nej till siffrorna` drops numbers only (meal stays); `nej, 40 g protein` (or another stated number) writes that key as `user` and leaves other numbers; `nej, det var X` is a whole-meal correction on the same instance (re-apply concrete vs unclear). Do not ask when the correction is already specific. Echo **Sparat:** one line. No “kcal kvar”. Stop.
+2. Meal: `Q_today_food`, `Q_covering_meal_plan` (and `Q_profile` if named library / `enligt vana` / `enligt schema`). Copy the `INSERT` from `skills/training-nutrition/SKILL.md` §4 if the SQL is not already in context — ignore that skill’s Before you start list. `åt enligt schema` / `vanlig {slot}` fills `name` / `library_key` from that date’s planned meal for the slot when present. Optional `kcal` / `protein_g` here (do not open `energy.md` or the rest of the skill): stated numbers → `user`, do not invent the other; estimate both only when the dish or main foods are known (library, named dish, stated portion, schema match); omit both when contents are unknown (`rester`, `drack en smoothie` without ingredients) or you are unsure; a bare day total without a slot (`åt 2400 kcal idag`) → ask once which meal, do not write. After an `(uppskattat)` echo: bare `nej` → ask once (siffrorna eller hela måltiden?), do not write; `nej till siffrorna` drops numbers only (meal stays); `nej, 40 g protein` (or another stated number) writes that key as `user` and leaves other numbers; `nej, det var X` is a whole-meal correction on the same instance (re-apply concrete vs unclear). Do not ask when the correction is already specific. Echo **Sparat:** one line. No “kcal kvar”. Do not `UPDATE` the meal plan because they ate something else. Stop.
 3. Weigh-in: `Q_profile`. Copy the `INSERT` and weight sync from §7 the same way. Do not rewrite `target_kcal`. Echo **Sparat:**. Stop.
 4. Saved prefs / calorie target: `Q_profile`. Answer from confirmed `data.nutrition` / `data.body`. Phrase `target_kcal` from `nutrition.goal` without opening `energy.md`: `improve_performance` / `build_muscle` / `general_health` → sikta mot minst {n}; `maintain` / `none` → riktmärke {n}; `lose_weight` → {n} (blygsamt underskott, never “minst”). Do not dump library ingredients. One line with vanearkivet counts if the library exists. Stop.
 5. Vanearkivet list or fetch: `Q_profile`. Present from `data.nutrition.library` per `skills/training-nutrition/SKILL.md` §8 (stable sort, case-insensitive, index vs one full card). Ignore that skill’s Before you start list. Empty library → say so. Do not invent. Offer once to add. Stop.
 
-“vad ska jag äta” / “hur går kosten” / “vad åt jag idag?” / save recipe → load `skills/training-nutrition/SKILL.md` and follow its intent-gated reads. Same message “hur gick veckan och kosten” → log skill §8 first, then nutrition §6.
+“hur går kosten” / “vad åt jag idag?” / save recipe / gör ett kostschema / byt lunch → load `skills/training-nutrition/SKILL.md` and follow its intent-gated reads. Same message “hur gick veckan och kosten” → log skill §8 first, then nutrition §6.
 
 ## Do not (any fast path)
 
@@ -34,6 +48,7 @@ When the user only reports a meal they ate (`åt X`, `vanlig lunch`), a weigh-in
 - Open `docs/safety.md`, `autonomy.md`, `provenance.md`, or `data-contracts.md`
 - Open `skills/*/references/*` or the other domain’s `SKILL.md`
 - Run `Q_pr`, `Q_last_working`, `Q_recent_working`, or `Q_lazy_activate_candidate` from a nutrition fast path
-- Run `Q_today_food`, `Q_week_food`, or `Q_week_weights` from a training fast path
+- Run `Q_lazy_activate_meal_plan`, `Q_covering_meal_plan`, `Q_queued_next_meal_plan`, `Q_today_food`, `Q_week_food`, or `Q_week_weights` from a training fast path
+- Run `Q_today_logs` or `Q_last_working` from the show-saved-schema path (no fuel)
 
 Chat history is a hint, not the source. If the SELECT fails, say so in Swedish. Do not invent a session or a meal. Estimated `kcal` / `protein_g` on a reported meal are allowed per nutrition §4; do not invent the meal itself.

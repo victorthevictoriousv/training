@@ -11,8 +11,8 @@ Create one ISO week of training from the confirmed profile. Draft in chat. Write
 
 - Collect a new profile (load `training-onboarding` instead). Exception: a gym-unavailable substitution from a covering plan is written here together with the plan update (`equipment.home_gym_substitutions`)
 - Log completed sets or extra-plan activity (load `training-log-and-review` instead)
-- Write meal plans or `recommendations`
-- Open `training-nutrition` or `skills/training-nutrition/references/energy.md`. Skip `Q_today_food`, `Q_week_food`, `Q_week_weights`
+- Write nutrition plans (`kind = nutrition`) or `recommendations` — meal weeks are `training-nutrition`
+- Open `training-nutrition` or `skills/training-nutrition/references/energy.md`. Skip `Q_today_food`, `Q_week_food`, `Q_week_weights`, `Q_covering_meal_plan`, `Q_lazy_activate_meal_plan`, `Q_queued_next_meal_plan`
 - Activate a plan when `safety_status` is `stop` or `unknown`
 - Add modalities the user did not confirm (`other` from a scheduled habit is allowed; do not add `other` to `data.modalities`)
 - Put `plan_inclusion = background` habits into `content.days` as sessions
@@ -68,12 +68,13 @@ Today = current date in `Europe/Stockholm`. Session lookup is by **date**, not b
 1. Set any `active` plan whose `period_end < today` to `completed` and `archived_at = now()`. That week ended; do not `superseded`.
 2. Set that `proposed` row to `active`, `activated_at = now()`, insert `plan_activated`.
 
-If `Q_lazy_activate_candidate` returns a row, complete the expired active week (if any), then activate. Run both `UPDATE`s then the `INSERT` in **one** SQL call, in this order. The second `UPDATE` no-ops (0 rows) when another plan is still `active` — do not insert `plan_activated` then; present `Q_covering_plan` as usual. Do not supersede a still-running week to force the activate.
+If `Q_lazy_activate_candidate` returns a row, complete the expired active **training** week (if any), then activate. Run both `UPDATE`s then the `INSERT` in **one** SQL call, in this order. The second `UPDATE` no-ops (0 rows) when another **training** plan is still `active` — do not insert `plan_activated` then; present `Q_covering_plan` as usual. Do not supersede a still-running week to force the activate. Filter every `plans` write with `kind = 'training'` so an active nutrition week cannot block or complete a training week.
 
 ```sql
 update plans
 set status = 'completed', archived_at = now()
 where user_id = :USER_ID
+  and kind = 'training'
   and status = 'active'
   and period_end < :today;
 
@@ -81,10 +82,12 @@ update plans
 set status = 'active', activated_at = now()
 where id = :proposed_plan_id
   and user_id = :USER_ID
+  and kind = 'training'
   and status = 'proposed'
   and not exists (
     select 1 from plans
     where user_id = :USER_ID
+      and kind = 'training'
       and status = 'active'
       and id <> :proposed_plan_id
   );
@@ -247,7 +250,7 @@ If `data.equipment` is missing `home_gym_substitutions`, `jsonb_set` still creat
 
 ### 5. Write after approval (new or replacement week)
 
-Keep at most one `active` plan (the database rejects a second). At most one `proposed` row per `period_start` (replacing a queued week: supersede that row first). `active` and `proposed` periods must not overlap. Chat drafts stay in the conversation until `godkänn`; a `proposed` **row** after approval is the saved next week, not a draft.
+Keep at most one `active` **training** plan (the database rejects a second `active` row per `kind`). At most one `proposed` row per `(kind, period_start)` (replacing a queued week: supersede that row first). `active` and `proposed` periods of the same `kind` must not overlap. Chat drafts stay in the conversation until `godkänn`; a `proposed` **row** after approval is the saved next week, not a draft. Always set `kind = 'training'` on `INSERT`.
 
 Today = current date in `Europe/Stockholm`. Allocate `new_plan_id` with `gen_random_uuid()` first. `version` is `1` for the first plan, otherwise previous `version + 1`. `payload` follows `docs/data-contracts.md`.
 
@@ -258,6 +261,7 @@ update plans
 set status = 'superseded', archived_at = now()
 where id = :old_plan_id
   and user_id = :USER_ID
+  and kind = 'training'
   and status = 'active';
 
 insert into events (user_id, type, source, source_status, plan_id, payload)
@@ -275,11 +279,12 @@ If there is no `active` plan for this path, skip the supersede step and set `sup
 
 ```sql
 insert into plans (
-  id, user_id, status, period_start, period_end, version,
+  id, user_id, kind, status, period_start, period_end, version,
   supersedes_plan_id, title, intent, content
 ) values (
   :new_plan_id,
   :USER_ID,
+  'training',
   'proposed',
   :period_start,
   :period_end,
@@ -298,7 +303,8 @@ values (
 update plans
 set status = 'active', activated_at = now()
 where id = :new_plan_id
-  and user_id = :USER_ID;
+  and user_id = :USER_ID
+  and kind = 'training';
 
 insert into events (user_id, type, source, source_status, plan_id, payload)
 values (
@@ -315,6 +321,7 @@ update plans
 set status = 'superseded', archived_at = now()
 where id = :old_proposed_id
   and user_id = :USER_ID
+  and kind = 'training'
   and status = 'proposed';
 
 insert into events (user_id, type, source, source_status, plan_id, payload)
@@ -332,11 +339,12 @@ Insert the new week as `proposed` and insert `plan_proposed`. **Do not** set it 
 
 ```sql
 insert into plans (
-  id, user_id, status, period_start, period_end, version,
+  id, user_id, kind, status, period_start, period_end, version,
   supersedes_plan_id, title, intent, content
 ) values (
   :new_plan_id,
   :USER_ID,
+  'training',
   'proposed',
   :period_start,
   :period_end,
