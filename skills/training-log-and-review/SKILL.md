@@ -1,6 +1,6 @@
 ---
 name: training-log-and-review
-description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, catching up habits after a quiet week, or a weekly overview of what happened (hur gick veckan / sammanfatta / vad har jag gjort på veckonivå). Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, asks for last weights, personal bests, or results, or wants a read-only summary of the covering week. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, or give meal plans, log meals, or log body weight (that is training-nutrition). If they also want extra work put in the week, remaining days adapted, or next week drafted, log or show the overview first, then load training-plan.
+description: Log completed or missed training — a single exercise with weight and reps, a run, today's whole session, filling remaining work from last loads (logga gympasset / klarade alla övningar), extra-plan activity (walk, treadmill, yoga, climbing, hiking), unplanned gym that is not in today's plan, a load correction, a PR question, how an exercise is progressing, catching up habits after a quiet week, or a weekly overview of what happened (hur gick veckan / sammanfatta / vad har jag gjort på veckonivå). Use whenever the user reports what they lifted, ran, walked, did yoga, climbed, or hiked, skips a session, asks for last weights, personal bests, or results, or wants a read-only summary of the covering week. Match intent, not exact wording. Do not use to create weekly plans, change programmed sessions, collect profile habits, give meal suggestions, log meals, log body weight, or review diet (that is training-nutrition). If they also want extra work put in the week, remaining days adapted, or next week drafted, log or show the overview first, then load training-plan. Same message “hur gick veckan och kosten”: this skill §8 first, then training-nutrition §6.
 ---
 
 # training-log-and-review
@@ -12,6 +12,7 @@ Record what actually happened. Do not invent loads.
 - Create or rewrite the weekly plan (load `training-plan`). Log first if they already did the work; do not UPDATE `plans` here
 - Save a recurring habit to the profile (load `training-onboarding`)
 - Log meals or write `food_logged` (load `training-nutrition`)
+- Open `training-nutrition` or `skills/training-nutrition/references/*`. Skip `Q_today_food`, `Q_week_food`, `Q_week_weights` unless the same message also asked about diet (then this skill §8 first, nutrition §6 second)
 - Invent kilogram values the user did not state or confirm on the shortcut card (copied last working after one `godkänn` is allowed)
 - Store kcal, MET, or TDEE
 - UPDATE or DELETE `events`
@@ -38,17 +39,18 @@ Classify once (meaning, not a phrase list). Run only those ids from `skills/_sha
 
 ## Before you start
 
-Read if not already in context:
+Classify intent first. Then read **only** the files that row needs. Do not open the others in this turn. Do not load a generic Supabase skill to run `Q_*`. Do not open `docs/safety.md`, `docs/provenance.md`, or `docs/data-contracts.md` (shapes live in `log-schema.md`). Do not open `training-nutrition`.
 
-- `docs/safety.md`
-- `docs/autonomy.md`
-- `docs/provenance.md`
-- `docs/data-contracts.md`
-- `skills/_shared/queries.md`
-- `references/log-schema.md`
-- `references/parse-and-match.md`
-- `references/loads-and-prs.md`
-- `skills/training-plan/references/activity-load.md`
+| Intent | Read now |
+| --- | --- |
+| Single set or correction (`bänk 80x5`) | `skills/_shared/queries.md`, `references/parse-and-match.md`, `references/log-schema.md` |
+| Extra-plan activity (`gåband`, `yoga`, `klättrade`) | `queries.md`, `parse-and-match.md`, `log-schema.md`, `skills/training-plan/references/activity-load.md` |
+| Wrap-up / skip (§4A, §5) | `queries.md`, `log-schema.md`, `activity-load.md` |
+| `logga gympasset` / `resten enligt plan` (§4B, §4C) | `queries.md`, `log-schema.md`, `docs/autonomy.md` |
+| PR / last weight / “hur går bänken” (§6) | `queries.md`, `references/loads-and-prs.md` |
+| Week overview (§8) | `queries.md`, `activity-load.md` |
+
+Use `USER_ID` from the Project instructions. Filter every query on that id.
 
 ## Extra session vs plan change
 
@@ -246,7 +248,7 @@ CTA: `Vill du att jag lägger nästa vecka utifrån det här?` Do not auto-draft
 
 Write nothing: no events, no `plans` UPDATE, no `recommendations`, no `user_profiles`.
 
-If the same message also asks to draft next week: this section first, then `training-plan`.
+If the same message also asks to draft next week: this section first, then `training-plan`. If the same message also asks how diet is going: this section first, then `training-nutrition` §6. Do not open nutrition refs here.
 
 ## Dialogue
 

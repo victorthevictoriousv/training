@@ -1,9 +1,11 @@
 ---
-description: Named Q_* reads skip the generic Supabase skill; show-saved-session is a fast path
+description: Named Q_* reads skip the generic Supabase skill; training show-saved-session and nutrition log/weigh-in/prefs are fast paths
 alwaysApply: true
 ---
 
-# Training query fast path
+# Query fast paths
+
+## Training — show saved session
 
 When the user only wants to **see** today / tomorrow / a named day / this week / “vad ska jag träna” (no change, no new week, no log). If they mean how the week went, a weekly overview, or a summary of what they did this week, load `skills/training-log-and-review/SKILL.md` §8 instead — not this path:
 
@@ -12,12 +14,25 @@ When the user only wants to **see** today / tomorrow / a named day / this week /
 3. If lazy-activate returns a row, open `skills/training-plan/SKILL.md` §1 for those writes only. Otherwise do not open that skill.
 4. Present **Sparat pass** from `plans.content` for that date. Stop.
 
-Do **not**:
+If they then ask to change the plan or draft a week, load `skills/training-plan/SKILL.md` and follow its intent-gated reads.
+
+## Nutrition — log, weigh-in, saved prefs
+
+When the user only reports a meal they ate (`åt X`, `vanlig lunch`), a weigh-in (`väger 88,6`), or asks what nutrition preferences / calorie target are saved — **no** meal suggestion, **no** “hur går kosten”, **no** save-recipe, **no** first-time diet setup:
+
+1. Open `skills/_shared/queries.md` only.
+2. Meal: `Q_today_food` (and `Q_profile` if named library / `enligt vana`). Copy the `INSERT` from `skills/training-nutrition/SKILL.md` §4 if the SQL is not already in context — ignore that skill’s Before you start list. Echo **Sparat:**. Stop.
+3. Weigh-in: `Q_profile`. Copy the `INSERT` and weight sync from §7 the same way. Do not rewrite `target_kcal`. Echo **Sparat:**. Stop.
+4. Saved prefs / calorie target: `Q_profile`. Answer from confirmed `data.nutrition` / `data.body`. Stop.
+
+“vad ska jag äta” / “hur går kosten” / save recipe → load `skills/training-nutrition/SKILL.md` and follow its intent-gated reads. Same message “hur gick veckan och kosten” → log skill §8 first, then nutrition §6.
+
+## Do not (any fast path)
 
 - Read the plugin Supabase skill (CLI, RLS checklist, `search_docs`)
 - Open `docs/safety.md`, `autonomy.md`, `provenance.md`, or `data-contracts.md`
-- Open `skills/training-plan/references/*` or other skill references
+- Open `skills/*/references/*` or the other domain’s `SKILL.md`
+- Run `Q_pr`, `Q_last_working`, `Q_recent_working`, or `Q_lazy_activate_candidate` from a nutrition fast path
+- Run `Q_today_food`, `Q_week_food`, or `Q_week_weights` from a training fast path
 
-Chat history is a hint, not the source. If the SELECT fails, say so in Swedish. Do not invent a session.
-
-If they then ask to change the plan or draft a week, load `skills/training-plan/SKILL.md` and follow its intent-gated reads.
+Chat history is a hint, not the source. If the SELECT fails, say so in Swedish. Do not invent a session or a meal.

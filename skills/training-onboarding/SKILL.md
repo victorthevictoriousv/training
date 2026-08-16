@@ -1,6 +1,6 @@
 ---
 name: training-onboarding
-description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, they want to set up diet (jag vill sätta upp kosten), they mention body weight / height / calorie target, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, log meals (that is training-nutrition food_logged), or give meal suggestions (that is training-nutrition).
+description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, they want to set up diet (jag vill sätta upp kosten), they mention body weight / height / calorie target, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, log meals or weigh-ins (training-nutrition), or give meal suggestions (training-nutrition).
 ---
 
 # training-onboarding
@@ -33,7 +33,14 @@ Classify once. Run only those ids from `skills/_shared/queries.md`. Writes stay 
 
 ## Before you start
 
-Read, in this order if not already in context (repo paths; from this skill folder use `../../docs/`):
+Classify intent first. Then read **only** the files that row needs. Do not open the others in this turn. Do not load a generic Supabase skill to run `Q_*`.
+
+| Intent | Read now |
+| --- | --- |
+| New user, missing profile, safety screening, field updates, habits, gym substitutions | the list below |
+| Set up diet §3d | `skills/_shared/queries.md`, `references/profile-fields.md`, `docs/autonomy.md`, `docs/provenance.md`. Also `skills/training-nutrition/references/energy.md` when proposing `target_kcal`. Do not open `training-nutrition/SKILL.md` or `meal-suggestions.md` |
+
+Full list (new-user / general profile), if not already in context (repo paths; from this skill folder use `../../docs/`):
 
 - `docs/safety.md`
 - `docs/autonomy.md`

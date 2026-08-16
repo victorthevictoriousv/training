@@ -5,12 +5,14 @@ description: Give meal suggestions from confirmed nutrition preferences, the
   wants lunch/dinner/evening ideas, asks how to fuel a session or recover from
   one, reports a meal they ate, logs a body weight, wants to save a recipe or
   food staple from a suggestion, asks how diet is going, wants the calorie
-  target reviewed or adjusted against training and food logs, mentions a food
-  reaction or new allergy, or asks about saved nutrition preferences. Match
-  intent, not exact wording. Do not use to collect the first nutrition profile
-  (that is training-onboarding), create or change weekly training plans
-  (training-plan), or log exercises or extra-plan activity
-  (training-log-and-review). Do not diagnose conditions or give clinical diets.
+  target reviewed against training and food, mentions a food reaction, or asks
+  about saved nutrition preferences. Meal log / weigh-in / saved prefs follow
+  the nutrition fast path (queries.md only) when there is no suggestion or
+  follow-up. Match intent, not exact wording. Do not use to collect the first
+  nutrition profile (training-onboarding), create or change weekly training
+  plans (training-plan), log exercises or extra-plan activity, or give a
+  weekly training overview (training-log-and-review). Do not diagnose
+  conditions or give clinical diets.
 ---
 
 # training-nutrition
@@ -23,6 +25,7 @@ Give meal suggestions in chat. Log meals and weigh-ins they report. Review diet 
 - Auto-rewrite `target_kcal` from a formula, a new weight, or a single log. Propose, wait for `godkänn`, then write
 - Create or change weekly training plans — hand off to `training-plan`
 - Log exercises, sessions, or extra-plan activity — hand off to `training-log-and-review`
+- Open `training-plan`, `training-log-and-review`, or their `references/`. Training load is listed `Q_*` only (`Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_week_events`). Never `Q_pr`, `Q_last_working`, `Q_recent_working`, `Q_lazy_activate_candidate`
 - Diagnose a food reaction, allergy, or condition; give clinical or medically restrictive diets
 - Store BMR, TDEE, macros, or MET anywhere
 - Write `recommendations` or `plans`
@@ -48,16 +51,25 @@ Classify once. Run only those ids from `skills/_shared/queries.md`. Match meanin
 
 ## Before you start
 
-Read, in this order if not already in context (repo paths; from this skill folder use `../../docs/`):
+Classify intent first. Then read **only** the files that row needs. Do not open the others in this turn. Do not load a generic Supabase skill to run `Q_*`. Do not open `docs/safety.md` or `docs/data-contracts.md` (safety gate and SQL shapes are in this file). A log / weigh-in / prefs lookup that already followed the project-instruction fast path should not re-open this skill’s references.
 
-- `docs/safety.md`
-- `docs/autonomy.md`
-- `docs/provenance.md`
-- `docs/data-contracts.md`
-- `skills/_shared/queries.md`
-- `references/meal-suggestions.md`
-- `references/energy.md` when they ask about energy or a target, or when proposing `target_kcal` via onboarding
-- `references/library.md` when reading or writing `nutrition.library`
+**Level A — log or suggest** (no constitution docs):
+
+| Intent | Read now |
+| --- | --- |
+| Saved prefs / calorie target (§1) | `skills/_shared/queries.md` |
+| Meal/snack suggestion (§2) | `queries.md`, `references/meal-suggestions.md`, `references/library.md`. Also `references/energy.md` only if they asked about amount/energy |
+| Food reaction / new allergy (§3) | `queries.md` |
+| Reported a meal (§4) | `queries.md` |
+| Weigh-in (§7) | `queries.md` |
+| First-time diet setup | hand off `training-onboarding` §3d |
+
+**Level B — write after approval** (keep `autonomy.md` + `provenance.md`; silence / “ok, berätta mer” / questions / partial agreement is not `godkänn`):
+
+| Intent | Read now |
+| --- | --- |
+| Save this suggestion as a staple/recipe (§5) | `queries.md`, `references/library.md`, `docs/autonomy.md`, `docs/provenance.md` |
+| How diet is going / justera kalorier (§6) | `queries.md`, `references/energy.md`, `docs/autonomy.md`, `docs/provenance.md` |
 
 Use `USER_ID` from the Project instructions. Filter every query on that id.
 
@@ -67,7 +79,7 @@ Use `USER_ID` from the Project instructions. Filter every query on that id.
 
 Run `Q_profile`. Answer from confirmed `data.nutrition` and `data.body` only. Missing keys are unknown, not a guess. If they want to add or change a field other than `nutrition.library` in this turn, hand off to `training-onboarding`. Do not write those fields here.
 
-If they ask what their calorie target is: print confirmed `nutrition.energy.target_kcal` if present, and that it is a working number they can change. BMR/TDEE only as **Mina slutsatser** from `references/energy.md`, never as saved facts. If they want it reviewed against this week’s training and food, go to §6.
+If they ask what their calorie target is: print confirmed `nutrition.energy.target_kcal` if present, and that it is a working number they can change. Do not open `references/energy.md` here. If they want BMR/TDEE or a review against this week’s training and food, go to §6.
 
 Clinical flags in this conversation (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target): refuse energy calculation and any `target_kcal` write. Tell them to seek care. Do not change `safety_status`. Other suggestions may continue without numbers.
 
@@ -93,11 +105,11 @@ Label the reply **Förslag**. Offer once: spara som recept / lägg i vanearkivet
 
 ### 3. Food reaction or new allergy
 
-Note it as their observation (`docs/provenance.md`), not a diagnosis. If they want it remembered, hand off to `training-onboarding` to confirm into `nutrition.allergies` or `nutrition.exclusions`. Write nothing here.
+Note it as their observation, not a diagnosis. If they want it remembered, hand off to `training-onboarding` to confirm into `nutrition.allergies` or `nutrition.exclusions`. Write nothing here.
 
 ### 4. Log a meal
 
-A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Reuse `activity_logged` instance rules in `docs/autonomy.md` and `docs/data-contracts.md`; `slot` plays `activity_key`'s role. Do not invent a second variant. Ambiguous match → ask once, do not write (same as gym logs).
+A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Same instance rules as `activity_logged`; `slot` plays `activity_key`'s role. Do not invent a second variant. Ambiguous match → ask once, do not write (same as gym logs).
 
 - Run `Q_today_food` for that date (default today in `Europe/Stockholm`).
 - New bout: `instance` = one more than today's max for that `slot` (start at 1).

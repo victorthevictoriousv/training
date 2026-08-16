@@ -1,6 +1,6 @@
 ---
 name: training-plan
-description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, adding an extra session this week (including on a rest day), reshaping the rest of the week after a new condition, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, or meal plans (that is training-nutrition). If they already did extra work, log it first, then return here only if they want remaining days adapted.
+description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, adding an extra session this week (including on a rest day), reshaping the rest of the week after a new condition, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, meal suggestions, meal logs, weigh-ins, or diet follow-up (that is training-nutrition). If they already did extra work, log it first, then return here only if they want remaining days adapted.
 ---
 
 # training-plan
@@ -12,6 +12,7 @@ Create one ISO week of training from the confirmed profile. Draft in chat. Write
 - Collect a new profile (load `training-onboarding` instead). Exception: a gym-unavailable substitution from a covering plan is written here together with the plan update (`equipment.home_gym_substitutions`)
 - Log completed sets or extra-plan activity (load `training-log-and-review` instead)
 - Write meal plans or `recommendations`
+- Open `training-nutrition` or `skills/training-nutrition/references/energy.md`. Skip `Q_today_food`, `Q_week_food`, `Q_week_weights`
 - Activate a plan when `safety_status` is `stop` or `unknown`
 - Add modalities the user did not confirm (`other` from a scheduled habit is allowed; do not add `other` to `data.modalities`)
 - Put `plan_inclusion = background` habits into `content.days` as sessions
@@ -54,7 +55,7 @@ New-week list (if not already in context):
 - `references/volume-and-slots.md`
 - `skills/training-log-and-review/references/loads-and-prs.md`
 
-A show-only lookup that already followed the project-instruction fast path should not re-open this skill’s references.
+A show-only lookup that already followed the project-instruction fast path should not re-open this skill’s references. Do not open `training-nutrition/SKILL.md` or `skills/training-nutrition/references/*`.
 
 ## Procedure
 

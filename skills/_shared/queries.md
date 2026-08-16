@@ -4,12 +4,30 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 ## How to run
 
-1. Classify intent with the skill’s intent table. On the show-saved-session fast path, skip that and use the ids listed there.
-2. Open this file and copy **only** the listed ids.
+1. Classify intent with the skill’s intent table. On the show-saved-session or nutrition log / weigh-in / prefs fast path, skip that and use the ids listed there.
+2. Open this file and copy **only** the listed ids (the groups below are orientation, not extra queries).
 3. Replace `:USER_ID` from Project instructions. Never invent another user.
 4. Replace other `:placeholders` from the skill (`:date` is the session date in `Europe/Stockholm`; `:today` is today’s date there).
 5. Do not run unlisted `Q_*` ids. Do not invent `ORDER BY`. Writes stay in the skill procedure.
 6. Do not load a generic Supabase skill, CLI help, or docs search to run these. Execute the copied SQL.
+
+## Id groups
+
+**Shared:** `Q_profile`, `Q_covering_plan`, `Q_habits`
+
+**Training show:** `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_today_logs`, `Q_last_working`, `Q_queued_next_week`
+
+**Training log:** `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_last_working`, `Q_pr`, `Q_recent_results`, `Q_habit_last_dates`, `Q_week_events`, `Q_queued_next_week`, `Q_habits`
+
+**Training draft week:** `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_recent_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events`
+
+**Nutrition day (suggestion):** `Q_profile`, `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_today_food`
+
+**Nutrition week / follow-up:** `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits`
+
+**Nutrition log / prefs:** `Q_profile`, `Q_today_food`
+
+Nutrition never runs `Q_pr`, `Q_last_working`, `Q_recent_working`, `Q_lazy_activate_candidate`. Training never runs `Q_today_food`, `Q_week_food`, `Q_week_weights` unless the same message also asked about diet.
 
 ---
 
