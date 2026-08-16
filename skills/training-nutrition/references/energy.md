@@ -42,7 +42,15 @@ Round TDEE to the nearest 50, then:
 - `build_muscle`: +200 to +300
 - `lose_weight`: −300 (max −500). Floor at BMR. Never a clinical deficit
 
-One stored number: the daily target. Not a second training-day target.
+One stored number: the daily target. Not a second training-day target. No extra tracking field.
+
+How that integer is *spoken* (same value, no extra key):
+
+- `improve_performance` / `build_muscle` / `general_health`: **sikta mot minst** that value — a floor to reach, not a budget to stay under
+- `maintain` / `none`: a **riktmärke**, neither floor nor ceiling
+- `lose_weight`: modest deficit as computed; never “minst”, never “kcal kvar” after a log
+
+Missing `target_kcal`: slot/habit tracking still works. Offer onboarding for a target; do not block meal logs.
 
 ## Same-day training add-on (inference, not stored)
 
@@ -60,6 +68,7 @@ Signals (facts vs unknown vs slutsats):
 
 - Training load this week from `Q_week_events` (logged sessions and activity, not `plans.content`)
 - Meals from `Q_week_food`. Missing days are **unknown intake**, never a confirmed deficit. Sum `kcal` only on current meals that have the key; sum `protein_g` the same way. Two incomplete totals; a missing key is unknown, not 0. Do not fill gaps. Do not present the sums as the day’s intake.
+- When they asked how they sit vs the target, or on this follow-up card: compare the incomplete kcal sum to `target_kcal` with the goal language above. Example: `Inloggat ~2350 av minst ~2600 (ofullständigt — lunch saknas)`. Never “du ligger under”. Never a remainder ticker after a meal log. `lose_weight` uses the same incomplete compare without “minst”.
 - Weight from `Q_week_weights`: weekly mean of latest-per-date kg if at least two days exist; otherwise only current `data.body.weight_kg`. One point is not a trend
 - Hunger, energy, recovery, performance: their words this turn, or notes they logged. Not a diagnosis
 
@@ -73,7 +82,7 @@ Do not change protein/fat working notes, library, and `target_kcal` in the same 
 
 ## Confirmation card
 
-**Bekräftade förslag** — `body.*` and proposed `target_kcal` if they are accepting it  
+**Bekräftade förslag** — `body.*` and proposed `target_kcal` if they are accepting it, phrased with the goal language above (`sikta mot minst 2600`, not only “dagligt mål 2600”)  
 **Fortfarande okänt** — missing inputs  
 **Mina slutsatser** — BMR, TDEE, PAL choice, protein guidance (~1.6–2.0 g/kg body weight), training-day add-on
 
@@ -90,5 +99,6 @@ Do not delete or silently rewrite `target_kcal`. Show that weight or the week ch
 - Print BMR/TDEE/macros on ordinary meal **Förslag** unless they asked about energy
 - Store kcal or protein on `body_weight_logged`, `activity_logged`, `exercise_logged`, or `nutrition.library`. Optional `kcal` / `protein_g` belong only on `food_logged`
 - Store `target_protein` or other macros on `user_profiles.data`
-- Say “du har X kcal kvar” or remaining protein after a log. Remainder vs `target_kcal` only if they asked
+- Say “du har X kcal kvar” or remaining protein after a log. That remainder ticker is never the default. An incomplete sum vs `target_kcal` with goal language is allowed on follow-up or when they asked (“hur ligger jag mot målet”) — that is not a remainder ticker
 - Treat a meal-kcal or protein sum as complete day intake, or missing meals as 0
+- Use floor language (“minst”) for `lose_weight`, or deficit/budget language for `improve_performance` / `build_muscle` / `general_health`

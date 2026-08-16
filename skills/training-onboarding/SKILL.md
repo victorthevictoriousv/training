@@ -137,7 +137,7 @@ Ask, in this order, only for gaps:
 3. `body.sex`, `body.birth_year`, `body.height_cm`, `body.weight_kg`
 4. Optional `nutrition.kitchen`: which meals they actually eat, weekday `time_min`, `skill` (`beginner | intermediate | advanced`)
 5. Library once: *Vad äter du ofta till lunch eller middag?* Same spirit as §3b. `nej` / `hoppa` → omit `nutrition.library`. Do not save `[]`
-6. If the calorie-target minimum in `references/profile-fields.md` is present and no clinical flag: load `skills/training-nutrition/references/energy.md`, compute BMR/TDEE as **Mina slutsatser**, propose `target_kcal` on the confirmation card. Wait for `godkänn`. Never write BMR/TDEE
+6. If the calorie-target minimum in `references/profile-fields.md` is present and no clinical flag: load `skills/training-nutrition/references/energy.md`, compute BMR/TDEE as **Mina slutsatser**, propose `target_kcal` on the confirmation card with that file’s goal language (`sikta mot minst X` for `improve_performance` / `build_muscle` / `general_health`; riktmärke for `maintain` / `none`; modest deficit for `lose_weight` — not only “dagligt mål X”). Wait for `godkänn`. Never write BMR/TDEE
 
 `lägg till matvana` / `spara receptet` / `ta bort` a library item with no live meal suggestion: load current `nutrition.library`, draft the merged list, confirm, then `profile_updated`. Keep unrelated items. Provenance key is `nutrition.library` for the whole array. If they are in a meal-suggestion turn, `training-nutrition` may write the library instead. Listing or fetching saved items without changing them is `training-nutrition` §8, not this section.
 
@@ -149,7 +149,7 @@ If they both confirm a staple and report eating it today, save the library here,
 
 In Swedish, clearly labelled:
 
-**Bekräftade förslag** — will be saved  
+**Bekräftade förslag** — will be saved. If the card includes proposed `nutrition.energy.target_kcal`, phrase it with `energy.md` goal language (`sikta mot minst X` / riktmärke / modest deficit — not only “dagligt mål X”)  
 **Fortfarande okänt** — will not be saved  
 **Mina slutsatser** — not saved as facts
 

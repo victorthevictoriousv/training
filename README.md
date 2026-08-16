@@ -13,7 +13,7 @@ v1 is a ChatGPT Project that:
 - confirms facts with the user before saving profile and plan drafts
 - logs explicit exercise lines, extra-plan activity, and optional meals without a second confirmation (optional kcal and protein on the meal, user-stated or estimated)
 - creates a first weekly plan only after the profile is confirmed
-- gives meal suggestions from confirmed nutrition preferences and a food/recipe library (no persisted weekly menu); may save a confirmed daily calorie target
+- gives meal suggestions from confirmed nutrition preferences and a food/recipe library (no persisted weekly menu); may save a confirmed daily calorie target (spoken from `nutrition.goal`: floor, riktmärke, or modest deficit)
 
 v1 is not a web app, not a custom backend, and not a custom MCP server.
 

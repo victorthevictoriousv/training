@@ -446,7 +446,7 @@ where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
 
 1. Nutrition onboarding (`jag vill sätta upp kosten`): confirm body + proposed `target_kcal` after `godkänn`.
 
-Expected: `data.body` has sex, birth_year, height_cm, weight_kg. `nutrition.energy.target_kcal` is an integer. No BMR, TDEE, macros, or MET keys in `data`. `recommendations_count` unchanged.
+Expected: `data.body` has sex, birth_year, height_cm, weight_kg. `nutrition.energy.target_kcal` is an integer. Confirmation card phrases the number with `nutrition.goal` (`sikta mot minst X` for `improve_performance` / `build_muscle` / `general_health`; not only “dagligt mål X”; `lose_weight` must not say “minst”). No BMR, TDEE, macros, or MET keys in `data`. `recommendations_count` unchanged.
 
 2. Save a staple (`lägg till matvana` with no live suggestion → onboarding §3d; spara from a **Förslag** → nutrition §5 with `autonomy.md` + `provenance.md` + `library.md`). Silence / “ok, berätta mer” is not `godkänn`.
 
@@ -458,7 +458,7 @@ Expected: a Swedish **Förslag** card that prefers library items for that slot a
 
 4. Log a meal without a second confirmation (`åt kycklingris till middag` or the staple name).
 
-Expected: nutrition fast path (`queries.md` + `Q_today_food`, **Sparat:**). Does not open the four constitution docs, training-skills, `meal-suggestions.md`, or `energy.md`. `event_count` increased by one `food_logged`. Concrete food with no stated numbers: payload has `kcal` and `protein_g` with `*_source = estimated` (kcal rounded to 50, protein to 5). Unclear contents (`åt rester`, `drack en smoothie` with no ingredients): no number keys. A bare day total without a slot (`åt 2400 kcal idag`): ask once which meal, no write. A second lunch the same day is a new `instance`. After an estimated echo, bare `nej` asks once (siffrorna eller hela måltiden?) and does not write; `nej till siffrorna` reuses instance and drops the number keys (meal stays). `nej, det var X` is a whole-meal correction on the same instance. `nej` / `rättelse` without an estimate also reuses instance.
+Expected: nutrition fast path (`queries.md` + `Q_today_food`, **Sparat:**). Does not open the four constitution docs, training-skills, `meal-suggestions.md`, or `energy.md`. `event_count` increased by one `food_logged`. Concrete food with no stated numbers: payload has `kcal` and `protein_g` with `*_source = estimated` (kcal rounded to 50, protein to 5). Unclear contents (`åt rester`, `drack en smoothie` with no ingredients): no number keys. A bare day total without a slot (`åt 2400 kcal idag`): ask once which meal, no write. A second lunch the same day is a new `instance`. After an estimated echo, bare `nej` asks once (siffrorna eller hela måltiden?) and does not write; `nej till siffrorna` reuses instance and drops the number keys (meal stays). `nej, 40 g protein` (or another stated number) writes that key as `user` and leaves other numbers — no clarifying question. `nej, det var X` is a whole-meal correction on the same instance (re-apply concrete vs unclear). `nej` / `rättelse` without an estimate also reuses instance. **Sparat:** is one line; no “kcal kvar”.
 
 4b. Stated kcal only (`lunch 700 kcal`).
 
@@ -472,13 +472,19 @@ Expected: `protein_g` + `protein_source = user`. No invented `kcal`.
 
 Expected: no `kcal` or `protein_g` on `exercise_logged` or on `nutrition.library`.
 
+4e. List today’s meals (`Vad åt jag idag?`, no new log).
+
+Expected: opens `training-nutrition` §4 list (`Q_profile` + `Q_today_food`) — not the meal-log fast path, not `energy.md`. Slot line vs `kitchen.meals` (e.g. `Lunch saknas`); numbers only on rows that have them; no remainder vs `target_kcal`.
+
 5. Suggestion with no meal log that day still returns **Förslag**. `godkänn` is required for target and library, not for “åt X”.
 
 6. Food reaction (`Jag tål inte laktos längre`): stays conversational (observation, not a diagnosis), offers the onboarding handoff, writes nothing itself until they confirm.
 
 7. Weigh-in without approving a new target (`väger 88,6`): nutrition fast path (`Q_profile`); **Sparat:**; `body_weight_logged` added; `body.weight_kg` matches; old `target_kcal` remains. Does not open constitution docs or training-skills.
 
-8. Follow-up (`hur går kosten?`): opens `training-nutrition` §6 plus `energy.md`, `docs/autonomy.md`, and `docs/provenance.md` — not `data-contracts.md` / `safety.md`, not the log skill’s weekly overview. Swedish facts / unknown / slutsats over the covering week’s training (`Q_week_events`), meals (`Q_week_food`), and weights (`Q_week_weights`). Sparse food is unknown, not a deficit. Optional meal `kcal` / `protein_g` are two incomplete sums (missing key ≠ 0). No “kcal kvar”. No auto-write of `target_kcal`. After `godkänn` of a proposed change, only that integer updates.
+7b. Saved calorie target (`Vad är mitt kalorimål?`): nutrition fast path (`Q_profile` only). Prints confirmed `target_kcal` as a working number, phrased from `nutrition.goal` (`improve_performance` → sikta mot minst {n}, not “håll dig under”). Does not open `energy.md` or constitution docs.
+
+8. Follow-up (`hur går kosten?` / `hur ligger jag mot målet?`): opens `training-nutrition` §6 plus `energy.md`, `docs/autonomy.md`, and `docs/provenance.md` — not `data-contracts.md` / `safety.md`, not the log skill’s weekly overview. Swedish facts / unknown / slutsats over the covering week’s training (`Q_week_events`), meals (`Q_week_food`), and weights (`Q_week_weights`). Sparse food is unknown, not a deficit. Optional meal `kcal` / `protein_g` are two incomplete sums (missing key ≠ 0). Slot line vs `kitchen.meals`. Incomplete kcal sum vs `target_kcal` uses goal language (`improve_performance` → `av minst ~2600 (ofullständigt — …)`; `lose_weight` must not say “minst”). No “kcal kvar”. No auto-write of `target_kcal`. After `godkänn` of a proposed change, only that integer updates.
 
 9. Eating-disorder (or clinician diet / insulin-diabetes) disclosure while asking for a calorie target: refuses `target_kcal`; `safety_status` and the training plan unchanged.
 

@@ -25,7 +25,7 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 **Nutrition week / follow-up:** `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits`
 
-**Nutrition log / prefs / vanearkivet:** `Q_profile`, `Q_today_food`
+**Nutrition log / prefs / vanearkivet / today list:** `Q_profile`, `Q_today_food`
 
 Nutrition never runs `Q_pr`, `Q_last_working`, `Q_recent_working`, `Q_lazy_activate_candidate`. Training never runs `Q_today_food`, `Q_week_food`, `Q_week_weights` unless the same message also asked about diet.
 

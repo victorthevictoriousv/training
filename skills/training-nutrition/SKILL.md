@@ -3,15 +3,17 @@ name: training-nutrition
 description: Give meal suggestions from confirmed nutrition preferences, the
   food/recipe library, and recent training. Use when the user asks what to eat,
   wants lunch/dinner/evening ideas, asks how to fuel a session or recover from
-  one, reports a meal they ate (optional kcal and protein on that log), logs a
+  one, reports a meal they ate (optional kcal and protein on that log), asks
+  what they ate today, logs a
   body weight, wants to save a recipe or
-  food staple from a suggestion, asks how diet is going, wants the calorie
+  food staple from a suggestion, asks how diet is going or how they sit versus
+  the calorie target, wants the calorie
   target reviewed against training and food, mentions a food reaction, asks
   about saved nutrition preferences, or wants to list or fetch saved recipes
   and food staples (mina recept, vanearkivet, hämta keso pita). Meal log /
   weigh-in / saved prefs / vanearkivet browse follow the nutrition fast path
   (queries.md only, plus §8 for vanearkivet presentation) when there is no
-  suggestion or follow-up. Match intent,
+  suggestion, follow-up, or “vad åt jag idag?” list. Match intent,
   not exact wording. Do not use to collect the first
   nutrition profile (training-onboarding), create or change weekly training
   plans (training-plan), log exercises or extra-plan activity, or give a
@@ -46,8 +48,9 @@ Classify once. Run only those ids from `skills/_shared/queries.md`. Match meanin
 | --- | --- | --- | --- |
 | Meal/snack suggestion, “vad ska jag äta”, lunch+middag+kväll, fuel/recover from a session | §2 | `Q_profile`, `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, `Q_today_food` | `Q_pr` |
 | Nutrition tied to the whole week | §2 (week variant) | Same as a day, plus `Q_week_events`, `Q_week_food`, `Q_habits` | `Q_pr`, `Q_recent_working` |
-| How diet is going / justera kalorier / följ upp mot träning och mat | §6 | `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` | `Q_pr`, plan writes |
-| Reported a meal (“åt X”, “vanlig lunch”) | §4 | `Q_profile`, `Q_today_food` | plan writes |
+| How diet is going / justera kalorier / hur ligger jag mot målet / följ upp mot träning och mat | §6 | `Q_profile`, `Q_covering_plan`, `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` | `Q_pr`, plan writes |
+| Reported a meal (“åt X”, “vanlig lunch”) | §4 | `Q_profile`, `Q_today_food` | plan writes; remainder ticker |
+| “Vad åt jag idag?” (list, no new log) | §4 (list) | `Q_profile`, `Q_today_food` | remainder vs target unless they asked; `energy.md` |
 | Weigh-in (“väger 88,6”, “ny vikt”) | §7 | `Q_profile` | auto-changing `target_kcal` |
 | Save this suggestion as a staple/recipe | §5 | `Q_profile` | `food_logged` unless they also ate it |
 | List vanearkivet / mina recept / matvanor, or fetch one (name or number) | §8 | `Q_profile` | meal suggestion, constitution, `food_logged` |
@@ -68,6 +71,7 @@ Classify intent first. Then read **only** the files that row needs. Do not open 
 | Meal/snack suggestion (§2) | `queries.md`, `references/meal-suggestions.md`, `references/library.md`. Also `references/energy.md` only if they asked about amount/energy |
 | Food reaction / new allergy (§3) | `queries.md` |
 | Reported a meal (§4) | `queries.md` |
+| Today’s meals list (§4) | `queries.md` |
 | Weigh-in (§7) | `queries.md` |
 | First-time diet setup | hand off `training-onboarding` §3d |
 
@@ -88,7 +92,7 @@ Run `Q_profile`. Answer from confirmed `data.nutrition` and `data.body` only. Mi
 
 Do not dump `nutrition.library` ingredients or methods here. If the library exists: one line with counts (`N recept`, `M vanor`) and that `mina recept` shows the index. Missing library: say the vanearkivet is empty. Listing or fetching items is §8.
 
-If they ask what their calorie target is: print confirmed `nutrition.energy.target_kcal` if present, and that it is a working number they can change. Do not open `references/energy.md` here. If they want BMR/TDEE or a review against this week’s training and food, go to §6.
+If they ask what their calorie target is: print confirmed `nutrition.energy.target_kcal` if present, and that it is a working number they can change. Phrase it from confirmed `nutrition.goal` without opening `references/energy.md`: `improve_performance` / `build_muscle` / `general_health` → **sikta mot minst** {n}; `maintain` / `none` → **riktmärke** {n}; `lose_weight` → {n} (blygsamt underskott, never “minst”); missing goal → the integer only. If they want BMR/TDEE or a review against this week’s training and food, go to §6.
 
 Clinical flags in this conversation (eating-disorder disclosure, clinician-prescribed diet, insulin-treated diabetes when they ask for a strict target): refuse energy calculation and any `target_kcal` write. Tell them to seek care. Do not change `safety_status`. Other suggestions may continue without numbers.
 
@@ -106,7 +110,7 @@ Then run `Q_covering_plan`, `Q_today_logs`, `Q_today_activity`, and `Q_today_foo
 
 Use what actually happened (`exercise_logged`, `activity_logged`, `session_completed`), not the aspirational plan. Prefer confirmed `nutrition.library` items whose `slots` match the ask. Skip a slot that already has a current `food_logged`. Compose 1–3 Swedish options. Rules in `references/meal-suggestions.md` and `references/library.md`.
 
-`lose_weight` with a saved `target_kcal` may shape portions as a modest deficit (see `energy.md`); never a clinical restriction. Mention `target_kcal` only if it is saved **and** they asked about amount/energy — not on every dinner tip.
+`lose_weight` with a saved `target_kcal` may shape portions as a modest deficit (see `energy.md`); never a clinical restriction. `improve_performance` / `build_muscle` / `general_health` may mention eating enough (floor) only if they asked about energy — never deficit or “kcal kvar”. Mention `target_kcal` only if it is saved **and** they asked about amount/energy — not on every dinner tip.
 
 Label the reply **Förslag**. Offer once: spara som recept / lägg i vanearkivet. Nothing is a saved meal plan.
 
@@ -140,7 +144,8 @@ A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmatio
   - `nej, det var X` / a different dish → whole-meal correction, same instance (existing rule). Re-apply concrete vs unclear on the new dish.
   - Bare `nej` / `rättelse` → ask once: siffrorna eller hela måltiden? Then write.
 - Without an estimate, `nej` / `rättelse` is a correction of the whole meal (existing rule).
-- Do not nag. Do not say remaining kcal or remaining protein. “Vad åt jag idag?” lists meals and any stored numbers — not a remainder vs `target_kcal` unless they asked.
+- Do not nag. Do not say remaining kcal or remaining protein after this echo. No ticker on **Sparat:**.
+- “Vad åt jag idag?” (list, no new log this turn): current meals (slot, name; numbers only if already on the row; `(enligt vana)` if `library_key`). Then one line vs confirmed `nutrition.kitchen.meals` when that array exists. Swedish slot labels as §8. Several snack instances: `N mellanmål`. Kitchen slots with no current row: `{slot} saknas`. Example: `Idag: frukost, middag, kväll, 3 mellanmål. Lunch saknas.` No valuation. No kcal comparison. Missing `kitchen.meals`: list logged slots only; do not invent expected meals. Empty day: say no meals logged; do not nag. Remainder vs `target_kcal` only if they also asked about amount or how they sit vs the target — that is §6, not this list.
 
 ```sql
 insert into events (
@@ -203,9 +208,9 @@ How diet is going. Read training, optional meals, and weights. Draw conclusions.
 2. Run `Q_covering_plan`. No row → say so; you may still use `data.body` and `target_kcal`. Do not invent a training week.
 3. If a covering row exists: `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` with that period.
 4. Swedish card, three layers (`docs/provenance.md`):
-   - **Fakta** — saved `target_kcal`; current `body.weight_kg`; current weigh-ins this week (latest per date); logged sessions/activity; logged meals (slots). Two incomplete sums over **current** meals: `kcal` where the key exists, `protein_g` where the key exists. Gaps counted separately. A missing key is unknown, not 0. Sparse food = unknown intake, not “they under-ate”.
+   - **Fakta** — saved `target_kcal` phrased with `nutrition.goal` (floor / riktmärke / modest deficit — `energy.md`); current `body.weight_kg`; current weigh-ins this week (latest per date); logged sessions/activity; logged meals (slots) plus one slot line vs `kitchen.meals` when present (same as §4 list). Two incomplete sums over **current** meals: `kcal` where the key exists, `protein_g` where the key exists. Gaps counted separately. A missing key is unknown, not 0. Sparse food = unknown intake, not “they under-ate”. Compare the incomplete kcal sum to `target_kcal` with that goal language (`Inloggat ~2350 av minst ~2600 (ofullständigt — lunch saknas)`). Never “du ligger under”. Never “kcal kvar”.
    - **Fortfarande okänt** — no food logs, meals without numbers, fewer than two weigh-ins, no training logs, hunger/energy they have not described.
-   - **Mina slutsatser** — rules in `references/energy.md` (review). Protein vs ~1.6–2.0 g/kg only here, never a stored target. After hard gym: more protein around the session as a suggestion, not “du ligger under”. At most **one** proposed change (target ±100–200, more carbohydrate around hard sessions, or add a staple). Do not change several things at once.
+   - **Mina slutsatser** — rules in `references/energy.md` (review). Protein vs ~1.6–2.0 g/kg only here, never a stored target. After hard gym: more protein around the session as a suggestion, not “du ligger under”. At most **one** proposed change (target ±100–200, more carbohydrate around logged hard sessions, or add a staple). Do not change several things at once.
 5. If they `godkänn` a new `target_kcal`: insert `profile_updated`, then `jsonb_set` `nutrition.energy.target_kcal`. Same coalesce pattern as library. Do not write BMR/TDEE.
 
 Do not write `recommendations`. Do not mix this into the training weekly overview (`training-log-and-review` §8).
