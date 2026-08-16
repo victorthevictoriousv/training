@@ -1,6 +1,6 @@
 # Loads, PRs, running, and results
 
-Derived from `exercise_logged`. No extra table. Do not use `activity_logged` for last working load, PRs, or running PRs.
+PRs live in `exercise_prs`, auto-maintained by a DB trigger on `exercise_logged` — skills only ever INSERT into `events`, never into `exercise_prs` directly. Last working and today's log are still derived live (`Q_last_working`, `Q_today_logs`). Do not use `activity_logged` for last working load or PRs.
 
 **Prescribe with RPE until there is a logged load. After that, track kg/reps/time so results are visible.** Do not show PRs unless asked.
 
@@ -30,7 +30,7 @@ When they mean they completed the session (`logga gympasset`, `klarade alla övn
 | --- | --- | --- |
 | Last working | Latest `exercise_logged` for that `exercise_key` (any date) | Default bar weight next time |
 | Today's log | Latest log for that key on the session date | **Loggat** / today's result |
-| PR | Max `load_kg` on **current** logs for that key (latest row per date; corrections replace that date) | Ceiling and “what is my PR?”. Not the default working weight |
+| PR | Max `load_kg` ever for that key, from `exercise_prs` (current logs; latest row per date; corrections replace that date) | Ceiling and “what is my PR?”. Not the default working weight |
 
 Last working beats PR for programming and for the shortcut fill.
 
@@ -42,11 +42,10 @@ SQL lives in `skills/_shared/queries.md`. Copy the named id; do not paste a vari
 | --- | --- |
 | Last working per exercise | `Q_last_working` |
 | Recent working logs per exercise (draft) | `Q_recent_working` |
-| PR per exercise (strength) | `Q_pr` |
-| Running PR (distance / duration / pace) | `Q_run_pr` |
+| PR per exercise (strength and running) | `Q_pr` |
 | Recent results for one exercise | `Q_recent_results` |
 
-`Q_pr` and `Q_run_pr` use **current** logs only (latest row per date + key). A correction (`nej`, `bänk 82.5`) replaces that date; the old kg is not a PR. `Q_pr` uses `[.]` for a literal decimal point so values like `82.5` count. Do not write `\\.` — that drops decimals. `Q_recent_working` is already collapsed per date; do not collapse again.
+`Q_pr` reads `exercise_prs` (trigger-maintained from **current** logs: latest row per date + key). A correction (`nej`, `bänk 82.5`) replaces that date; the old kg is not a PR. Rows with every PR dimension null are omitted. `Q_recent_working` is already collapsed per date; do not collapse again.
 
 Ordered by logged date first, then insert time, so a backfilled entry for an earlier date never outranks a genuinely more recent session.
 
@@ -76,7 +75,7 @@ When *drafting a new week* (plan proposal):
 | Different kg (already raised) | start from the latest; do not bump unless the streak at *that* kg is 2 |
 
 Do not bump from a single last log. Do not count calendar weeks. Do not run `Q_recent_results` once per exercise (`Q_recent_working` only). Do not bump when *showing* a saved session or filling `logga gympasset`.
-4. Never jump more than 2.5 kg in one week (the streak bump is already that step). Do not run `Q_pr` or `Q_run_pr` on draft.
+4. Never jump more than 2.5 kg in one week (the streak bump is already that step). Do not run `Q_pr` on draft.
 5. Label kg as **Förslag vikt** (from logs), not as a confirmed PR.
 
 Put suggested kg in the chat draft and in `item.load` (e.g. `80 kg, RPE 7`) only after the usual plan approval.
@@ -86,9 +85,9 @@ Put suggested kg in the chat draft and in `item.load` (e.g. `80 kg, RPE 7`) only
 Store on the set object: `duration_min` and/or `distance_km`, `load_kg` null.
 
 | Last | Latest run: duration and/or distance and intensity |
-| PR distance | Max `distance_km` on current logs (`Q_run_pr`) |
-| PR duration | Max `duration_min` on current logs (`Q_run_pr`) |
-| PR pace | Fastest min/km among current logs with both distance and duration (`Q_run_pr`) |
+| PR distance | Max `distance_km` on current logs (`Q_pr` / `exercise_prs`) |
+| PR duration | Max `duration_min` on current logs (`Q_pr` / `exercise_prs`) |
+| PR pace | Fastest min/km among current logs with both distance and duration (`Q_pr` / `exercise_prs`) |
 
 No run history → RPE/prattempo from the plan. History → last duration/distance as the target. Do not jump to longest-ever PR. Shortcut fill of a run session copies last duration/distance after the same card + `godkänn`.
 

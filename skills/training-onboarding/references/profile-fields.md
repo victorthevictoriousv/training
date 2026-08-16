@@ -67,11 +67,17 @@ User's own words, not diagnoses.
 
 If they name a drug, set `medications_mentioned: true` and write an `events` observation payload without copying the drug name into `data`. Never advise on medication.
 
-### `nutrition` (optional in v1)
+### `nutrition` (optional)
 
-- `goal`, `allergies`, `exclusions`, `preferences`
+- `goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`
+- `dietary_pattern` (optional): `omnivore | vegetarian | vegan | pescatarian | other`
+- `allergies`: string array
+- `exclusions`: string array
+- `preferences`: string array — free-text notes beyond the structured fields above (e.g. "gillar inte fisk")
 
-Collect if offered. Do not generate meal plans.
+Collect if offered. `training-nutrition` turns these into chat-only
+suggestions (tone only: `lose_weight` is not a diet or kcal target); this
+skill still owns the write. Do not generate meal plans here.
 
 ### `recovery` / `life` (optional)
 
@@ -113,7 +119,7 @@ Use this when the user asks what you still need.
 | --- | --- |
 | Better programming | `experience.*` for selected modalities, `availability.windows`, `availability.two_a_day`, `equipment.items`, `health.injuries`, `lifestyle.habits`, `recovery.sleep_hours` / `recovery.stress` |
 | Logging / review (later) | nothing required in v1 |
-| Nutrition (later) | `nutrition.allergies`, `nutrition.exclusions`, `nutrition.preferences`, `lifestyle.habits` |
+| Nutrition | `nutrition.goal`, `nutrition.dietary_pattern`, `nutrition.allergies`, `nutrition.exclusions`, `nutrition.preferences`, `lifestyle.habits` |
 
 ## Provenance entry
 

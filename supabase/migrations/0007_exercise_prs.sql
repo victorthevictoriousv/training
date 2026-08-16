@@ -1,0 +1,201 @@
+-- Dedicated PR table, kept in sync from current exercise_logged rows.
+-- Skills never INSERT/UPDATE this table. ChatGPT must not run this (or any DDL).
+
+create table exercise_prs (
+  user_id uuid not null,
+  exercise_key text not null,
+  pr_kg numeric,
+  pr_kg_event_id uuid references events (id),
+  pr_kg_date date,
+  pr_distance_km numeric,
+  pr_distance_event_id uuid references events (id),
+  pr_distance_date date,
+  pr_duration_min numeric,
+  pr_duration_event_id uuid references events (id),
+  pr_duration_date date,
+  pr_pace_min_per_km numeric,
+  pr_pace_event_id uuid references events (id),
+  pr_pace_date date,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, exercise_key)
+);
+
+alter table exercise_prs enable row level security;
+
+comment on table exercise_prs is
+  'Current-log PRs per exercise_key. Populated only by update_exercise_prs() on events insert. Skills never write this table. A correction replaces that date.';
+
+create or replace function recompute_exercise_prs(p_user_id uuid, p_exercise_key text)
+returns void
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if p_exercise_key is null or p_exercise_key = '' then
+    return;
+  end if;
+
+  with current_logs as (
+    select distinct on (payload->>'date')
+      id,
+      payload,
+      case
+        when (payload->>'date') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        then (payload->>'date')::date
+      end as log_date
+    from events
+    where user_id = p_user_id
+      and type = 'exercise_logged'
+      and payload->>'exercise_key' = p_exercise_key
+    order by payload->>'date', occurred_at desc
+  ),
+  set_rows as (
+    select
+      c.id as event_id,
+      c.log_date,
+      case
+        when (s->>'load_kg') ~ '^[0-9]+([.][0-9]+)?$'
+        then (s->>'load_kg')::numeric
+      end as load_kg,
+      case
+        when (s->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
+        then (s->>'distance_km')::numeric
+      end as distance_km,
+      case
+        when (s->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
+         and (
+           (s->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
+           or p_exercise_key ~ '(run|jog|lopp)'
+         )
+        then (s->>'duration_min')::numeric
+      end as duration_min,
+      case
+        when (s->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
+         and (s->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
+         and (s->>'distance_km')::numeric > 0
+        then (s->>'duration_min')::numeric / (s->>'distance_km')::numeric
+      end as pace_min_per_km
+    from current_logs c
+    cross join lateral jsonb_array_elements(coalesce(c.payload->'sets', '[]'::jsonb)) as s
+  ),
+  kg as (
+    select event_id, log_date, load_kg
+    from set_rows
+    where load_kg is not null
+    order by load_kg desc, log_date desc, event_id
+    limit 1
+  ),
+  dist as (
+    select event_id, log_date, distance_km
+    from set_rows
+    where distance_km is not null
+    order by distance_km desc, log_date desc, event_id
+    limit 1
+  ),
+  dur as (
+    select event_id, log_date, duration_min
+    from set_rows
+    where duration_min is not null
+    order by duration_min desc, log_date desc, event_id
+    limit 1
+  ),
+  pace as (
+    select event_id, log_date, pace_min_per_km
+    from set_rows
+    where pace_min_per_km is not null
+    order by pace_min_per_km asc, log_date desc, event_id
+    limit 1
+  )
+  insert into exercise_prs (
+    user_id,
+    exercise_key,
+    pr_kg,
+    pr_kg_event_id,
+    pr_kg_date,
+    pr_distance_km,
+    pr_distance_event_id,
+    pr_distance_date,
+    pr_duration_min,
+    pr_duration_event_id,
+    pr_duration_date,
+    pr_pace_min_per_km,
+    pr_pace_event_id,
+    pr_pace_date,
+    updated_at
+  )
+  select
+    p_user_id,
+    p_exercise_key,
+    kg.load_kg,
+    kg.event_id,
+    kg.log_date,
+    dist.distance_km,
+    dist.event_id,
+    dist.log_date,
+    dur.duration_min,
+    dur.event_id,
+    dur.log_date,
+    pace.pace_min_per_km,
+    pace.event_id,
+    pace.log_date,
+    now()
+  from (select 1) as dummy
+  left join kg on true
+  left join dist on true
+  left join dur on true
+  left join pace on true
+  on conflict (user_id, exercise_key) do update set
+    pr_kg = excluded.pr_kg,
+    pr_kg_event_id = excluded.pr_kg_event_id,
+    pr_kg_date = excluded.pr_kg_date,
+    pr_distance_km = excluded.pr_distance_km,
+    pr_distance_event_id = excluded.pr_distance_event_id,
+    pr_distance_date = excluded.pr_distance_date,
+    pr_duration_min = excluded.pr_duration_min,
+    pr_duration_event_id = excluded.pr_duration_event_id,
+    pr_duration_date = excluded.pr_duration_date,
+    pr_pace_min_per_km = excluded.pr_pace_min_per_km,
+    pr_pace_event_id = excluded.pr_pace_event_id,
+    pr_pace_date = excluded.pr_pace_date,
+    updated_at = now();
+end;
+$$;
+
+create or replace function update_exercise_prs()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if new.type is distinct from 'exercise_logged' then
+    return new;
+  end if;
+  if new.payload->>'exercise_key' is null or new.payload->>'exercise_key' = '' then
+    return new;
+  end if;
+  perform recompute_exercise_prs(new.user_id, new.payload->>'exercise_key');
+  return new;
+end;
+$$;
+
+drop trigger if exists events_update_exercise_prs on events;
+create trigger events_update_exercise_prs
+after insert on events
+for each row
+execute procedure update_exercise_prs();
+
+do $$
+declare
+  r record;
+begin
+  for r in
+    select distinct user_id, payload->>'exercise_key' as exercise_key
+    from events
+    where type = 'exercise_logged'
+      and payload->>'exercise_key' is not null
+      and payload->>'exercise_key' <> ''
+  loop
+    perform recompute_exercise_prs(r.user_id, r.exercise_key);
+  end loop;
+end;
+$$;

@@ -1,6 +1,6 @@
 ---
 name: training-plan
-description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, adding an extra session this week (including on a rest day), reshaping the rest of the week after a new condition, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, or meal plans. If they already did extra work, log it first, then return here only if they want remaining days adapted.
+description: Create, show, or change a weekly training plan combining strength, running, mobility, and recovery. Use whenever the user wants to see or change *planned* training — including today's session, tomorrow, a named day, the weekly plan, skipping/moving a session, adding an extra session this week (including on a rest day), reshaping the rest of the week after a new condition, swapping an exercise, or saying a planned exercise does not exist at the routine gym and needs a substitute (that also updates home_gym_substitutions). Match intent, not exact wording. Do not use for logging completed sets, extra-plan walks/climbing/hiking (that is training-log-and-review), general profile collection, weekly reviews, or meal plans (that is training-nutrition). If they already did extra work, log it first, then return here only if they want remaining days adapted.
 ---
 
 # training-plan
@@ -23,9 +23,9 @@ Classify once (meaning, not a phrase list). Run only those ids from `skills/_sha
 
 | User means | Section | Queries | Skip |
 | --- | --- | --- | --- |
-| Today / tomorrow / a named day / “vad ska jag träna” | §4 | `Q_lazy_activate_candidate` (apply §1 writes if a row), `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr`, `Q_run_pr`, `Q_activity_lookback`, week INSERT |
-| This week / the weekly plan | §4 | Same as a day, plus `Q_queued_next_week` | `Q_pr`, `Q_run_pr` |
-| Draft or approve a new week | §2–3, §5 | `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_recent_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events` | `Q_pr`, `Q_run_pr`, `Q_last_working`. Future week: do not activate |
+| Today / tomorrow / a named day / “vad ska jag träna” | §4 | `Q_lazy_activate_candidate` (apply §1 writes if a row), `Q_covering_plan`, `Q_today_logs`, `Q_last_working` | `Q_pr`, `Q_activity_lookback`, week INSERT |
+| This week / the weekly plan | §4 | Same as a day, plus `Q_queued_next_week` | `Q_pr` |
+| Draft or approve a new week | §2–3, §5 | `Q_profile`, `Q_lazy_activate_candidate`, `Q_covering_plan`, `Q_queued_next_week`, `Q_recent_working`, `Q_activity_lookback`, `Q_habit_last_dates`, `Q_week_events` | `Q_pr`, `Q_last_working`. Future week: do not activate |
 | Swap, gym-unavailable, extra session, reshape remaining | §4 | `Q_covering_plan`, then draft; writes after `godkänn` | Log `INSERT`, `Q_pr` |
 | They already did the work | hand off `training-log-and-review` | — | Plan UPDATE until they ask |
 | PR / last weight / “hur går det” | hand off log skill | — | All plan writes |

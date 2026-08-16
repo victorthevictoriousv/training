@@ -37,19 +37,37 @@ where tgrelid = 'events'::regclass
 
 Expected: both indexes, both constraints, and the append-only trigger.
 
-4. Confirm the four tables still exist:
+4. [`0006_exercise_key_index.sql`](../supabase/migrations/0006_exercise_key_index.sql), [`0007_exercise_prs.sql`](../supabase/migrations/0007_exercise_prs.sql), and [`0008_exercise_prs_safe_date.sql`](../supabase/migrations/0008_exercise_prs_safe_date.sql) have been applied. Confirm:
+
+```sql
+select indexname
+from pg_indexes
+where tablename = 'events'
+  and indexname = 'events_exercise_logged_key_idx';
+
+select tgname
+from pg_trigger
+where tgrelid = 'events'::regclass
+  and tgname = 'events_update_exercise_prs';
+
+select to_regclass('public.exercise_prs') as exercise_prs;
+```
+
+Expected: the index, the trigger, and a non-null `exercise_prs` oid.
+
+5. Confirm the five tables still exist:
 
 ```sql
 select table_name
 from information_schema.tables
 where table_schema = 'public'
-  and table_name in ('user_profiles', 'plans', 'events', 'recommendations')
+  and table_name in ('user_profiles', 'plans', 'events', 'recommendations', 'exercise_prs')
 order by table_name;
 ```
 
-Expected: four rows.
+Expected: five rows.
 
-5. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
+6. Project instructions already use `SUPABASE_PROJECT_REF=eqgfiaqqsmupbvcvcuce`.
 
 `USER_ID` is already set to `815c0d8e-9e76-4dbb-9c89-86a504bb5da0`. Keep it unless you intentionally rotate identity.
 
@@ -296,7 +314,16 @@ If the latest log for that key missed reps or has RPE ≥ 9: hold or −2.5, not
 
 After an `exercise_logged` for a key at a high kg, send a correction (`nej, [lower] kg` or `[lift] [lower]`). Then: `Vad är mitt PR i [lift]?`
 
-Expected: PR is the corrected (current) kg, not the superseded row. `Q_pr` must not change if you only `UPDATE` an event (that write must fail: events are append-only).
+Expected: PR is the corrected (current) kg, not the superseded row. `exercise_prs.pr_kg` for that key matches the current-log max. `Q_pr` must not change if you only `UPDATE` an event (that write must fail: events are append-only).
+
+Then log a lighter set for the same key on a **different** date. Expected: `pr_kg` stays at the current-log max (the lighter day does not lower PR).
+
+```sql
+select exercise_key, pr_kg, pr_kg_date
+from exercise_prs
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0'
+order by exercise_key;
+```
 
 ### D9. Profile merge does not wipe
 
@@ -364,6 +391,26 @@ After `godkänn`: if that Monday is **after today**, a new `proposed` row; curre
 3. Mid-week (today is not Sunday): remaining days of the covering week are **kvar**, not hoppat över / missade.
 
 4. With no covering plan for today (or a named week with no row): `ingen sparad plan` (or equivalent). No invented overview. No events written.
+
+### I. Nutrition suggestion (chat-only)
+
+Prerequisite: a covering week and some logged training or extra-plan activity today (or name a day that has logs). Count first:
+
+```sql
+select count(*) as recommendations_count
+from recommendations
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
+
+select data->'nutrition' as nutrition
+from user_profiles
+where user_id = '815c0d8e-9e76-4dbb-9c89-86a504bb5da0';
+```
+
+New chat: ask for a suggestion tied to today's training (`Vad ska jag äta efter passet?` or similar).
+
+Expected: a Swedish **Förslag** card that references real logged activity (not only the aspirational plan). No kcal, macros, or TDEE. Event / plan / `recommendations` counts unchanged. `user_profiles.data.nutrition` unchanged.
+
+Sub-case: report a food reaction (`Jag tål inte laktos längre` or similar). Expected: it stays conversational (observation, not a diagnosis), offers the `training-onboarding` handoff to save into `nutrition.allergies` / `exclusions`, and writes nothing itself. Repeat the counts above — still unchanged until they confirm via onboarding.
 
 ## 5. What you cannot verify from this repo alone
 

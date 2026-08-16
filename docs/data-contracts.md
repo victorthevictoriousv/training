@@ -92,7 +92,29 @@ Event types:
 - `session_missed`
 - `activity_logged`
 
-Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PR is max numeric `load_kg` across **current** logs for that key (latest row per date; a correction replaces that date). Running PR is max `distance_km` / `duration_min` and fastest pace on current logs (`Q_run_pr`). Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Do not UPDATE earlier rows. Do not store PRs in a separate table. Do not mix `activity_logged` into exercise PR or last-load queries.
+Current load for an exercise on a date is the latest `exercise_logged` for that `user_id + payload.date + payload.exercise_key`. Last working load is the latest log for that `exercise_key` on any date. PRs live in `exercise_prs` (one row per `exercise_key`): max numeric `load_kg`, max `distance_km` / `duration_min`, and fastest pace from **current** logs (latest row per date; a correction replaces that date). Read with `Q_pr`. Current extra-plan activity for a date is the latest `activity_logged` per `user_id + payload.date + payload.activity_key + payload.instance` (missing `instance` = 1). Day load is the sum of those current bouts. Do not UPDATE earlier rows. Do not mix `activity_logged` into exercise PR or last-load queries.
+
+### `exercise_prs`
+
+One row per `user_id` + `exercise_key`. Populated only by `update_exercise_prs()` on `events` insert. Skills never INSERT/UPDATE this table. Values are current-log PRs; a correction replaces that date.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | `uuid` not null | Part of primary key |
+| `exercise_key` | `text` not null | Part of primary key |
+| `pr_kg` | `numeric` | Max `load_kg` on current logs |
+| `pr_kg_event_id` | `uuid` | `events.id` of the current-log row that produced `pr_kg` |
+| `pr_kg_date` | `date` | Logged date of that row |
+| `pr_distance_km` | `numeric` | Max `distance_km` on current logs |
+| `pr_distance_event_id` | `uuid` | |
+| `pr_distance_date` | `date` | |
+| `pr_duration_min` | `numeric` | Max `duration_min` on current logs (duration-only only for run-like keys: run, jog, lopp) |
+| `pr_duration_event_id` | `uuid` | |
+| `pr_duration_date` | `date` | |
+| `pr_pace_min_per_km` | `numeric` | Fastest min/km among current logs with both distance and duration |
+| `pr_pace_event_id` | `uuid` | |
+| `pr_pace_date` | `date` | |
+| `updated_at` | `timestamptz` not null | |
 
 ### `recommendations`
 
@@ -160,7 +182,8 @@ Only confirmed fields. Omit keys that are not yet confirmed.
     "medications_mentioned": false
   },
   "nutrition": {
-    "goal": "",
+    "goal": "build_muscle",
+    "dietary_pattern": "omnivore",
     "allergies": [],
     "exclusions": [],
     "preferences": []
@@ -220,6 +243,7 @@ Field rules:
 - `availability.anchor` is optional preference text the planner may drop under poor recovery or time pressure
 - `health.*` stores the user's own words and lists, not diagnoses
 - `medications_mentioned` is a boolean flag only. Do not store drug names in `data`. If the user mentions medication, record an observation event and never give medication advice
+- `nutrition.goal`: `lose_weight | build_muscle | maintain | improve_performance | general_health | none`. `nutrition.dietary_pattern`: `omnivore | vegetarian | vegan | pescatarian | other`. Both are closed enums. `allergies`, `exclusions`, and `preferences` stay string arrays. Optional. `training-nutrition` reads these as tone, not as a diet: `lose_weight` never becomes a deficit or kcal target. Never store kcal, macros, or TDEE here
 - `modalities` is the set the user wants in weekly plans
 - `lifestyle.habits` is optional. Recurring activity outside the four training modalities. Pattern only: an instance must be `activity_logged` to count as done. Do not store kcal, MET, or TDEE here
 - habit `kind`: `lifestyle` (easy everyday movement or easy mobility/yoga ritual) or `extra` (recreational load such as climbing or hiking)

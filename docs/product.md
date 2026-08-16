@@ -34,27 +34,27 @@ v1 runtime: a ChatGPT Project with the GitHub connector and the official Supabas
 v1 implements:
 
 - shared safety, autonomy, and provenance rules
-- four tables: `user_profiles`, `plans`, `events`, `recommendations`
+- five tables: `user_profiles`, `plans`, `events`, `recommendations`, `exercise_prs`
 - RLS enabled with no anon policies (Data API denied)
 - `training-onboarding`
 - `training-plan` for the weekly plan and showing saved sessions. Background habits stay out of `plans.content` and count only when logged (`activity_logged`). Scheduled habits (e.g. climbing on a named weekday) become `other` sessions with `habit_key`. Same-day stacking is allowed on some days when the profile says so; it is not a 5+5 template. If a planned exercise is missing at the routine gym, the home alternative is prescribed and the first choice stays on the item as `preferred`; that pair is stored in `equipment.home_gym_substitutions`. A this-week swap (they want another exercise, not that the gym lacks it) does not write the profile
-- `training-log-and-review` for exercise and session logging plus extra-plan activity, and a read-only weekly overview in chat (no write). PRs are derived from current `exercise_logged` only (latest row per date + key); they are not shown unless asked. Bare “hur gick veckan” on Monday summarizes the week that just ended.
+- `training-log-and-review` for exercise and session logging plus extra-plan activity, and a read-only weekly overview in chat (no write). PRs live in `exercise_prs`, one row per `exercise_key`, kept in sync by a DB trigger on `exercise_logged` from **current** logs (a correction replaces that date) — no skill writes to it directly. Not shown unless asked. Bare “hur gick veckan” on Monday summarizes the week that just ended.
+- `training-nutrition` for chat-only meal suggestions tied to confirmed preferences and recent activity (no writes)
 
 v1 does not implement:
 
-- `training-nutrition` (meal suggestions)
 - auth, user-scoped RLS policies, multiple users, admin, or invites
 - a web app, custom backend, custom MCP server, or background jobs
 - Garmin read/write
 - automatic research monitoring
-- periodization engines or dedicated PR tables
+- periodization engines (mesocycles, blocks, automatic deloads) beyond the Förslag vikt streak rule in `loads-and-prs.md`
 - publishing as an OpenAI plugin
 - auto-progressing loads into the next week's proposal beyond the existing **Förslag vikt** rule in `loads-and-prs.md` (applied when drafting, written to `item.load` only after approval)
 - a named gym registry or more than one routine gym; “another gym” is the first-choice (`preferred`) on a plan item
 
 ## Skills
 
-Four skills are in scope for the product. Nutrition is still a stub.
+Five skills are in scope for the product.
 
 ### `training-onboarding`
 
@@ -66,11 +66,11 @@ Creates and changes weekly plans across the modalities the user actually chose. 
 
 ### `training-log-and-review`
 
-Logs completed and missed sessions, per-exercise sets (load, reps, optional RPE), and extra-plan activity (`activity_logged`: walks, yoga, climbing, hiking, and similar). A whole-session shortcut may copy last working loads into `exercise_logged` after one approval. Writes append-only `events`. A profile habit is not done until logged. After a week without habit logs, ask once with the user's habit names. A weekly overview is a Swedish chat card (facts / unknown / conclusion) over the covering week’s plan and logs; it does not write `events`, `plans`, `recommendations`, `user_profiles`, or a new event type. Bare “hur gick veckan” on Monday is the week that just ended. PRs use current logs only (a correction replaces that date). Next week is a `training-plan` draft after they ask. Must not activate major plan changes.
+Logs completed and missed sessions, per-exercise sets (load, reps, optional RPE), and extra-plan activity (`activity_logged`: walks, yoga, climbing, hiking, and similar). A whole-session shortcut may copy last working loads into `exercise_logged` after one approval. Writes append-only `events`. A profile habit is not done until logged. After a week without habit logs, ask once with the user's habit names. A weekly overview is a Swedish chat card (facts / unknown / conclusion) over the covering week’s plan and logs; it does not write `events`, `plans`, `recommendations`, `user_profiles`, or a new event type. Bare “hur gick veckan” on Monday is the week that just ended. PRs live in `exercise_prs` (trigger from current logs; a correction replaces that date). Next week is a `training-plan` draft after they ask. Must not activate major plan changes.
 
-### `training-nutrition` (deferred)
+### `training-nutrition`
 
-Collects nutrition preferences and constraints. Gives simple meal suggestions tied to training, goals, recovery, confirmed lifestyle habits, and `activity_logged`. No diagnoses, no medication advice, no clinical diets. Do not store kcal as confirmed facts.
+Reads confirmed profile nutrition fields plus recent training and extra-plan activity. Writes nothing in v1 (chat-only, same zero-write pattern as the weekly overview — no `recommendations` row). Does not collect or write `nutrition.*` itself (`training-onboarding` still owns that). No diagnoses, clinical diets, or kcal. Food reactions are chat observations confirmed into the profile only via onboarding.
 
 ## Defaults
 
@@ -79,6 +79,6 @@ These are easy to change later:
 - One personal `user_id` stored in the ChatGPT Project instructions
 - Locale `sv-SE`, timezone `Europe/Stockholm`, ISO week Monday–Sunday (`week_start = 1`)
 - First weekly plan combines only the modalities the user selected
-- Nutrition preferences may be stored on the profile; no meal plans in v1
+- Nutrition preferences may be stored on the profile; `training-nutrition` turns them into chat-only meal suggestions, not persisted meal plans
 - `recommendations` exists but is unused in the first vertical
 - Schema changes go through SQL files in this repo, not ad-hoc DDL in chat

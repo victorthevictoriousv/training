@@ -9,10 +9,11 @@ The product is called **training**. Do not rename it to AI-PT, AI PT, or ai-pt.
 v1 is a ChatGPT Project that:
 
 - follows versioned skills in this repo
-- reads and writes four Supabase tables through the official Supabase ChatGPT app
+- reads five Supabase tables through the official Supabase ChatGPT app (`exercise_prs` is trigger-maintained; skills never write it)
 - confirms facts with the user before saving profile and plan drafts
 - logs explicit exercise lines and extra-plan activity without a second confirmation
 - creates a first weekly plan only after the profile is confirmed
+- gives chat-only meal suggestions from confirmed nutrition preferences (nothing persisted as a meal plan)
 
 v1 is not a web app, not a custom backend, and not a custom MCP server.
 
@@ -40,11 +41,15 @@ supabase/migrations/   Versioned Postgres schema
 | [skills/training-onboarding/](skills/training-onboarding/) | Collect and confirm the profile |
 | [skills/training-plan/](skills/training-plan/) | Create, show, and change the weekly plan |
 | [skills/training-log-and-review/](skills/training-log-and-review/) | Log sets, loads, extra-plan activity, and completed or missed sessions |
+| [skills/training-nutrition/](skills/training-nutrition/) | Chat-only meal suggestions; never writes |
 | [skills/_shared/queries.md](skills/_shared/queries.md) | Named `SELECT`s (`Q_*`). Skills name an id; they do not paste SQL |
 | [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) | Initial schema |
 | [supabase/migrations/0003_activity_logged.sql](supabase/migrations/0003_activity_logged.sql) | `activity_logged` event type |
 | [supabase/migrations/0004_plan_active_uniqueness.sql](supabase/migrations/0004_plan_active_uniqueness.sql) | DB-level guard: at most one `active` plan per user |
 | [supabase/migrations/0005_invariants.sql](supabase/migrations/0005_invariants.sql) | Append-only `events`; ISO week; one `proposed` per period; no overlapping `active`/`proposed` |
+| [supabase/migrations/0006_exercise_key_index.sql](supabase/migrations/0006_exercise_key_index.sql) | Index on `exercise_logged` `exercise_key` for last-working scans |
+| [supabase/migrations/0007_exercise_prs.sql](supabase/migrations/0007_exercise_prs.sql) | `exercise_prs` table; trigger recomputes current-log PRs |
+| [supabase/migrations/0008_exercise_prs_safe_date.sql](supabase/migrations/0008_exercise_prs_safe_date.sql) | Safe date cast in the PR recompute so a bad log date cannot abort `events` insert |
 
 ## Language
 

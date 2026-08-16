@@ -15,7 +15,7 @@ Canonical `SELECT` statements. Skills name a `Q_*` id; they do not paste these s
 
 ### Q_profile
 
-Current profile row. Onboarding load; plan draft; safety gate.
+Current profile row. Onboarding load; plan draft; safety gate; nutrition context.
 
 ```sql
 select id, user_id, locale, timezone, week_start,
@@ -28,7 +28,7 @@ where user_id = :USER_ID;
 
 ### Q_habits
 
-Confirmed habits only. Activity logging and typicals. Skip during a mid-set gym log.
+Confirmed habits only. Activity logging and typicals. Skip during a mid-set gym log; nutrition context.
 
 ```sql
 select data->'lifestyle'->'habits' as habits
@@ -140,7 +140,7 @@ order by payload->>'exercise_key', payload->>'date' desc, occurred_at desc;
 
 ### Q_today_logs
 
-`exercise_logged` on `:date`. Current load per key is the first row for that key (already newest-first).
+`exercise_logged` on `:date`. Current load per key is the first row for that key (already newest-first); nutrition context.
 
 ```sql
 select payload, occurred_at
@@ -155,7 +155,7 @@ order by occurred_at desc;
 
 ### Q_today_activity
 
-`activity_logged` on `:date`. Latest row per `activity_key` + `instance` (missing `instance` = 1). Next bout: `max(instance) + 1` for that date + key.
+`activity_logged` on `:date`. Latest row per `activity_key` + `instance` (missing `instance` = 1). Next bout: `max(instance) + 1` for that date + key; nutrition context.
 
 ```sql
 select payload, occurred_at
@@ -186,7 +186,7 @@ order by occurred_at desc;
 
 ### Q_week_events
 
-Logs in the covering week. Weekly overview and the one-line “denna vecka i korthet” when drafting. `:period_start` / `:period_end` come from `Q_covering_plan`, never guessed. Skip this query if there is no covering row.
+Logs in the covering week. Weekly overview and the one-line “denna vecka i korthet” when drafting; nutrition context. `:period_start` / `:period_end` come from `Q_covering_plan`, never guessed. Skip this query if there is no covering row.
 
 ```sql
 select type, plan_id, payload, occurred_at
@@ -217,70 +217,21 @@ group by payload->>'habit_key';
 
 ### Q_pr
 
-Max numeric `load_kg` per exercise from **current** logs only (latest row per date + `exercise_key`). A correction does not keep the old kg as a PR. Only when they ask for a strength PR. `[.]` is a literal dot (do not write `\\.`). Running PRs: `Q_run_pr`.
+Personal records, one row per `exercise_key`, from `exercise_prs`. Maintained by a DB trigger from **current** `exercise_logged` (latest row per date + key; a correction replaces that date). Never written by a skill. Only when they ask. Strength and running PRs both come from this id. Skip rows where every PR dimension is null (bodyweight / timed with no qualifying kg, distance, duration, or pace).
 
 ```sql
-select current_log.payload->>'exercise_key' as exercise_key,
-       max((set_row->>'load_kg')::numeric) as pr_kg
-from (
-  select distinct on (payload->>'exercise_key', payload->>'date')
-    payload
-  from events
-  where user_id = :USER_ID
-    and type = 'exercise_logged'
-  order by payload->>'exercise_key', payload->>'date', occurred_at desc
-) current_log
-cross join lateral jsonb_array_elements(current_log.payload->'sets') as set_row
-where (set_row->>'load_kg') ~ '^[0-9]+([.][0-9]+)?$'
-group by 1;
-```
-
----
-
-### Q_run_pr
-
-Max distance / duration and fastest pace from **current** `exercise_logged` per date + key. Only when they ask for a running PR (10 km, tid, pace). Do not use `activity_logged`. `[.]` is a literal dot.
-
-```sql
-select
-  exercise_key,
-  max(distance_km) as pr_distance_km,
-  max(duration_min) as pr_duration_min,
-  min(pace_min_per_km) filter (where pace_min_per_km is not null) as pr_pace_min_per_km
-from (
-  select
-    current_log.payload->>'exercise_key' as exercise_key,
-    case
-      when (set_row->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
-      then (set_row->>'distance_km')::numeric
-    end as distance_km,
-    case
-      when (set_row->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
-      then (set_row->>'duration_min')::numeric
-    end as duration_min,
-    case
-      when (set_row->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
-       and (set_row->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
-       and (set_row->>'distance_km')::numeric > 0
-      then (set_row->>'duration_min')::numeric
-         / (set_row->>'distance_km')::numeric
-    end as pace_min_per_km
-  from (
-    select distinct on (payload->>'exercise_key', payload->>'date')
-      payload
-    from events
-    where user_id = :USER_ID
-      and type = 'exercise_logged'
-    order by payload->>'exercise_key', payload->>'date', occurred_at desc
-  ) current_log
-  cross join lateral jsonb_array_elements(current_log.payload->'sets') as set_row
-  where (set_row->>'distance_km') ~ '^[0-9]+([.][0-9]+)?$'
-     or (
-       (set_row->>'duration_min') ~ '^[0-9]+([.][0-9]+)?$'
-       and current_log.payload->>'exercise_key' ~ '(run|jog|lopp)'
-     )
-) t
-group by 1;
+select exercise_key, pr_kg, pr_kg_date,
+       pr_distance_km, pr_distance_date,
+       pr_duration_min, pr_duration_date,
+       pr_pace_min_per_km, pr_pace_date
+from exercise_prs
+where user_id = :USER_ID
+  and (
+    pr_kg is not null
+    or pr_distance_km is not null
+    or pr_duration_min is not null
+    or pr_pace_min_per_km is not null
+  );
 ```
 
 ---

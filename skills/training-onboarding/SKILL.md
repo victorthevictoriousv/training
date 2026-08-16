@@ -1,6 +1,6 @@
 ---
 name: training-onboarding
-description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, or give meal plans.
+description: Collect, confirm, and update the training user profile. Use when the user is new, profile fields are missing, they mention goals, experience, time, equipment, injuries, health, recovery, life constraints, two sessions in one day, training as a hobby, or recurring everyday movement / extra sports / yoga (walks, climbing, hiking, yoga habits), they say lägg till vana / ändra vana / ta bort vana, they add or remove routine-gym substitutions with no live session change, they say nu har gymmet X, or they ask to update the profile. Do not use to create weekly plans, swap a planned exercise on an active week (that is training-plan, including gym-unavailable), log sessions or extra-plan activity instances, or give meal plans (that is training-nutrition).
 ---
 
 # training-onboarding
@@ -71,7 +71,7 @@ Ask 2–4 questions per turn. Prefer this order after screening:
 3. Training **days** per week (not session count); which windows usually exist (lunch / evening / morning) and roughly how long; whether two sessions the same day is fine on *some* days (`two_a_day: some_days` if yes). Do not ask them to design the week or pick a gym+run quota
 4. Location and equipment
 5. Injuries/pain in their own words (observation + confirmed health lists)
-6. Optional: sleep, stress, schedule, nutrition preferences (allergies/exclusions only). If they confirmed high volume willingness or `two_a_day: some_days`, ask sleep/stress in this cluster (still optional to save)
+6. Optional: sleep, stress, schedule, nutrition (`goal`, `dietary_pattern`, allergies, exclusions, preferences) if offered. If they confirmed high volume willingness or `two_a_day: some_days`, ask sleep/stress in this cluster (still optional to save)
 
 If they say training is a hobby or they like training a lot, put that in `goals.notes` as their words. Do not invent elite volume tolerance.
 
