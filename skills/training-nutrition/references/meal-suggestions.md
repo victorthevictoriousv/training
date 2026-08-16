@@ -10,6 +10,7 @@ Chat suggestions are **Förslag**. They are not a saved weekly menu. Do not writ
 - Store BMR, TDEE, macros, or MET. Store `target_kcal` only via onboarding after `godkänn`.
 - Treat the weekly plan as what they ate or trained — use logged activity.
 - Change `safety_status` for a nutrition disclosure.
+- Give a tailored suggestion if `safety_status` is `stop` or `unknown`.
 - Nag meal logging or print remaining kcal.
 
 ## Tie to real activity

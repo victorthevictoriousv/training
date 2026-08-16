@@ -27,7 +27,7 @@ Give meal suggestions in chat. Log meals and weigh-ins they report. Review diet 
 - Store BMR, TDEE, macros, or MET anywhere
 - Write `recommendations` or `plans`
 - Change `safety_status` for a nutrition disclosure
-- Give a tailored training-fuel suggestion if `safety_status` is `stop` or `unknown`
+- Give a tailored suggestion if `safety_status` is `stop` or `unknown` (ordinary generic food is allowed when `stop` so they can eat; do not use training logs or a calorie target)
 - Nag them to log meals or weigh-ins. Do not say remaining kcal
 
 ## Intent
@@ -73,10 +73,10 @@ Clinical flags in this conversation (eating-disorder disclosure, clinician-presc
 
 ### 2. Meal or snack suggestion
 
-Run `Q_profile`. Safety gate for **training fuel**:
+Run `Q_profile`. Safety gate:
 
-- `stop` → refuse. Tell them to seek care. Do not suggest food as training fuel.
-- `unknown` → route to `training-onboarding` for screening first. Do not give a tailored fuel suggestion.
+- `stop` → tell them to seek care. Do not give a tailored suggestion. Ordinary generic food is allowed so they can eat. Do not use today’s training logs or `target_kcal`. Do not suggest food as training fuel.
+- `unknown` → route to `training-onboarding` for screening first. Generic only. Do not tailor.
 - `cleared` or `restricted` → continue. If `restricted`, stay conservative.
 
 Missing `nutrition.*` → a generic suggestion is fine. Offer the onboarding handoff for a tailored one. Missing library is fine: invent 1–3 **Förslag**.
@@ -97,12 +97,13 @@ Note it as their observation (`docs/provenance.md`), not a diagnosis. If they wa
 
 ### 4. Log a meal
 
-A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Reuse `activity_logged` instance rules in `docs/autonomy.md` and `docs/data-contracts.md`; `slot` plays `activity_key`'s role. Do not invent a second variant.
+A clear line (`åt kycklingris till middag`, `vanlig lunch`) is user confirmation. Reuse `activity_logged` instance rules in `docs/autonomy.md` and `docs/data-contracts.md`; `slot` plays `activity_key`'s role. Do not invent a second variant. Ambiguous match → ask once, do not write (same as gym logs).
 
 - Run `Q_today_food` for that date (default today in `Europe/Stockholm`).
 - New bout: `instance` = one more than today's max for that `slot` (start at 1).
 - `nej` / `rättelse` keeps the latest `instance` for that slot.
-- Named library item with no extra detail: copy `name` / `library_key` from `nutrition.library`, echo `(enligt vana)`.
+- Named library item with no extra detail: copy `name` / `library_key` from `nutrition.library`, echo `(enligt vana)`. If that name matches more than one library item, ask once.
+- Slot unclear (no meal time in the message, and the library item has more than one `slots` value, or none) → ask once. A clear slot in the message wins (`lunch var linsgryta` writes even when it is not in the library).
 - `INSERT` `food_logged` (`source = user`, `source_status = confirmed`). Echo **Sparat:**. No second `godkänn`.
 - Do not store kcal. Do not nag. Do not summarise remaining energy unless they asked (“vad åt jag idag?”).
 
@@ -163,7 +164,7 @@ If they also ate it today, log §4 in the same turn after the library write (or 
 
 How diet is going. Read training, optional meals, and weights. Draw conclusions. Do not nag for missing food logs.
 
-1. Run `Q_profile`. Clinical flags → refuse a new `target_kcal`; do not change `safety_status`.
+1. Run `Q_profile`. Clinical flags → refuse a new `target_kcal`; do not change `safety_status`. `stop` or `unknown` → do not propose a new target from training load.
 2. Run `Q_covering_plan`. No row → say so; you may still use `data.body` and `target_kcal`. Do not invent a training week.
 3. If a covering row exists: `Q_week_events`, `Q_week_food`, `Q_week_weights`, `Q_habits` with that period.
 4. Swedish card, three layers (`docs/provenance.md`):
@@ -180,7 +181,7 @@ A clear line (`väger 88,6`, `88.6 kg idag`) is user confirmation. No second `go
 
 - Date = today in `Europe/Stockholm` unless they named a day.
 - `INSERT` `body_weight_logged` (`source = user`, `source_status = confirmed`).
-- `jsonb_set` `data.body.weight_kg` to that number. Provenance `body.weight_kg` with this event’s id. Do not insert a separate `profile_updated`.
+- Sync `data.body.weight_kg` with the coalesce-parent `jsonb_set` below (create `{body}` if missing). Provenance `body.weight_kg` with this event’s id. Do not insert a separate `profile_updated`.
 - Echo **Sparat:** the kg. Do **not** rewrite `target_kcal`. Optionally one line: weight changed; say till if they want the target reviewed (§6).
 
 ```sql
@@ -196,9 +197,36 @@ insert into events (
 returning id;
 ```
 
-Then `jsonb_set` `{body,weight_kg}` and provenance `{body.weight_kg}` with that `id`. If `INSERT` fails because the type is missing: say the live schema is missing `body_weight_logged`. Do not run DDL.
+Then:
 
-`nej` / `rättelse` → another `body_weight_logged` for that date; latest wins; update `data.body.weight_kg` to the new number.
+```sql
+update user_profiles
+set
+  data = jsonb_set(
+    jsonb_set(
+      data,
+      '{body}',
+      coalesce(data->'body', '{}'::jsonb)
+    ),
+    '{body,weight_kg}',
+    to_jsonb(:weight_kg)
+  ),
+  provenance = jsonb_set(
+    provenance,
+    '{body.weight_kg}',
+    jsonb_build_object(
+      'source', 'user',
+      'status', 'confirmed',
+      'confirmed_at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'event_id', :event_id
+    )
+  )
+where user_id = :USER_ID;
+```
+
+If `INSERT` fails because the type is missing: say the live schema is missing `body_weight_logged`. Do not run DDL.
+
+`nej` / `rättelse` → another `body_weight_logged` for that date; latest wins; same coalesce `jsonb_set` for `data.body.weight_kg`.
 
 Changing goal, allergies, or kitchen is still `training-onboarding` §3d.
 

@@ -97,6 +97,7 @@ Read context. Do not require exact wording. Examples below are illustrations, no
 - `logga gympasset` / `klarade alla övningar` / similar → fill remaining working items from last working (today’s planned sets; last kg; last reps if set count matches). Ask all missing weights once. Card, one `godkänn`, then `exercise_logged` plus `session_completed`. Do not copy PR, plan RPE, or auto-bump. Not the same as “enligt plan” (no weights).
 - `hoppade över` → `session_missed` after a short confirm if the intent is unclear; a clear “jag hoppade över dagens pass” may be saved and echoed. Missing a background walk or background yoga is not a missed session. Skipping a scheduled habit session is `session_missed`. If they also want the rest of the week reshaped, that is a plan change (`training-plan`), not a log write.
 - Ambiguous exercise match → ask, do not write.
+- Ambiguous meal log (unclear `slot`, or more than one library match) → ask once, do not write (`training-nutrition`).
 - Unplanned gym that does not match that day's planned items → `exercise_logged` with `session_id` null even if the day has another session (do not attach extra lunch strength to an evening run). Do not write `session_completed` for that extra work. `logga gympasset` only fills a planned strength session.
 - After extra lower body the same day as a remaining quality run: echo the log, then offer to swap that run to easy jogging (`training-plan`). Do not auto-write the plan. Easy gåband or yoga does not trigger this.
 
